@@ -1,13 +1,50 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React, { useState } from 'react';
+import Login from './Login';
+import DashboardLayout from '../components/layout/DashboardLayout';
+import AdminDashboard from './admin/AdminDashboard';
+import EncadreurDashboard from './encadreur/EncadreurDashboard';
+import EtudiantDashboard from './etudiant/EtudiantDashboard';
+import UserManagement from './admin/UserManagement';
 
 const Index = () => {
+  // Simulation d'authentification - à remplacer par un vrai système
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState({
+    role: 'admin' as 'admin' | 'encadreur' | 'etudiant',
+    name: 'Admin Test'
+  });
+  const [currentPage, setCurrentPage] = useState('dashboard');
+
+  // Si non authentifié, afficher la page de connexion
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
+  // Rendu du contenu selon la page active
+  const renderContent = () => {
+    switch (currentPage) {
+      case 'dashboard':
+        if (currentUser.role === 'admin') return <AdminDashboard />;
+        if (currentUser.role === 'encadreur') return <EncadreurDashboard />;
+        if (currentUser.role === 'etudiant') return <EtudiantDashboard />;
+        break;
+      case 'users':
+        return <UserManagement />;
+      default:
+        return currentUser.role === 'admin' ? <AdminDashboard /> : 
+               currentUser.role === 'encadreur' ? <EncadreurDashboard /> : 
+               <EtudiantDashboard />;
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
-    </div>
+    <DashboardLayout 
+      userRole={currentUser.role} 
+      userName={currentUser.name}
+    >
+      {renderContent()}
+    </DashboardLayout>
   );
 };
 
