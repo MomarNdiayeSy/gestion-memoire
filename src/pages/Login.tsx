@@ -4,9 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, BookOpen } from "lucide-react";
+import { Eye, EyeOff, BookOpen, User, GraduationCap, Shield } from "lucide-react";
 
-const Login = () => {
+interface LoginProps {
+  onLogin: (role: 'admin' | 'encadreur' | 'etudiant') => void;
+}
+
+const Login = ({ onLogin }: LoginProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -15,7 +19,7 @@ const Login = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement authentication
+    // TODO: Implement real authentication
     console.log('Login attempt:', formData);
   };
 
@@ -99,6 +103,37 @@ const Login = () => {
                 </button>
               </div>
             </form>
+
+            {/* Boutons de connexion rapide pour le développement */}
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <p className="text-sm text-gray-600 text-center mb-4">Connexion rapide (développement)</p>
+              <div className="space-y-3">
+                <Button 
+                  onClick={() => onLogin('admin')}
+                  variant="outline"
+                  className="w-full h-10 border-red-200 text-red-700 hover:bg-red-50"
+                >
+                  <Shield className="mr-2 h-4 w-4" />
+                  Se connecter comme Administrateur
+                </Button>
+                <Button 
+                  onClick={() => onLogin('encadreur')}
+                  variant="outline"
+                  className="w-full h-10 border-blue-200 text-blue-700 hover:bg-blue-50"
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Se connecter comme Encadreur
+                </Button>
+                <Button 
+                  onClick={() => onLogin('etudiant')}
+                  variant="outline"
+                  className="w-full h-10 border-green-200 text-green-700 hover:bg-green-50"
+                >
+                  <GraduationCap className="mr-2 h-4 w-4" />
+                  Se connecter comme Étudiant
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

@@ -16,9 +16,19 @@ const Index = () => {
   });
   const [currentPage, setCurrentPage] = useState('dashboard');
 
+  // Fonction de connexion temporaire pour le développement
+  const handleLogin = (role: 'admin' | 'encadreur' | 'etudiant') => {
+    setIsAuthenticated(true);
+    setCurrentUser({
+      role: role,
+      name: role === 'admin' ? 'Admin Test' : 
+            role === 'encadreur' ? 'Dr. Ahmed Ben Ali' : 'Marie Dupont'
+    });
+  };
+
   // Si non authentifié, afficher la page de connexion
   if (!isAuthenticated) {
-    return <Login />;
+    return <Login onLogin={handleLogin} />;
   }
 
   // Rendu du contenu selon la page active
@@ -42,6 +52,7 @@ const Index = () => {
     <DashboardLayout 
       userRole={currentUser.role} 
       userName={currentUser.name}
+      onNavigate={setCurrentPage}
     >
       {renderContent()}
     </DashboardLayout>
