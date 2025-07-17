@@ -1,0 +1,200 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  ENCADREUR
+  ETUDIANT
+}
+
+enum MemoireStatus {
+  EN_COURS
+  SOUMIS
+  EN_REVISION
+  VALIDE
+  REJETE
+  SOUTENU
+}
+
+enum SujetStatus {
+  EN_ATTENTE
+  VALIDE
+  REJETE
+  ATTRIBUE
+}
+
+enum SessionStatus {
+  PLANIFIEE
+  EFFECTUEE
+  ANNULEE
+}
+
+enum PaiementStatus {
+  EN_ATTENTE
+  VALIDE
+  REJETE
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  nom           String
+  prenom        String
+  role          String    // ADMIN, ENCADREUR, ETUDIANT
+  specialite    String?   // Pour les encadreurs
+  matricule     String?   // Pour les étudiants
+  telephone     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  memoiresEncadres    Memoire[]  @relation("Encadreur")
+  memoireEtudiant     Memoire?   @relation("Etudiant")
+  sessionsEncadreur   Session[]  @relation("EncadreurSessions")
+  sessionsEtudiant    Session[]  @relation("EtudiantSessions")
+  sujetsEncadres      Sujet[]    @relation("EncadreurSujets")
+  paiements           Paiement[]
+  notifications       Notification[]
+  jurysPresident      Jury[]     @relation("JuryPresident")
+  jurysRapporteur     Jury[]     @relation("JuryRapporteur")
+  jurysExaminateur    Jury[]     @relation("JuryExaminateur")
+}
+
+model Memoire {
+  id              String        @id @default(uuid())
+  titre           String
+  description     String
+  status          String        // EN_COURS, SOUMIS, VALIDE, REJETE, SOUTENU
+  fichierUrl      String?       // URL du fichier PDF
+  motsCles        String[]      // Mots-clés pour la recherche
+  dateDepot       DateTime?     // Date de dépôt du mémoire final
+  dateSoutenance  DateTime?     // Date de soutenance si status = SOUTENU
+  note            Float?        // Note finale après soutenance
+  mention         String?       // Mention obtenue
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  etudiantId      String       @unique
+  etudiant        User         @relation("Etudiant", fields: [etudiantId], references: [id])
+  encadreurId     String
+  encadreur       User         @relation("Encadreur", fields: [encadreurId], references: [id])
+  sujetId         String
+  sujet           Sujet        @relation(fields: [sujetId], references: [id])
+  documents       Document[]
+  jury            Jury?
+  historique      HistoriqueMemoireStatus[]
+}
+
+model Sujet {
+  id              String      @id @default(uuid())
+  titre           String
+  description     String
+  status          String      // EN_ATTENTE, VALIDE, REJETE, ATTRIBUE
+  motsCles        String[]    // Mots-clés pour la recherche
+  dateValidation  DateTime?   // Date de validation par l'admin
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  encadreurId     String
+  encadreur       User        @relation("EncadreurSujets", fields: [encadreurId], references: [id])
+  memoires        Memoire[]
+}
+
+model Session {
+  id            String      @id @default(uuid())
+  date          DateTime
+  duree         Int         // en minutes
+  status        String      // PLANIFIE, TERMINE, ANNULE
+  rapport       String?     // Rapport de la séance
+  remarques     String?     // Remarques de l'encadreur
+  visaEncadreur Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  encadreurId   String
+  encadreur     User        @relation("EncadreurSessions", fields: [encadreurId], references: [id])
+  etudiantId    String
+  etudiant      User        @relation("EtudiantSessions", fields: [etudiantId], references: [id])
+}
+
+model Document {
+  id          String    @id @default(uuid())
+  nom         String
+  url         String
+  type        String    // Type de document (rapport, annexe, etc.)
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  memoireId   String
+  memoire     Memoire   @relation(fields: [memoireId], references: [id])
+}
+
+model Jury {
+  id              String    @id @default(uuid())
+  dateSoutenance  DateTime
+  salle           String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  memoireId       String    @unique
+  memoire         Memoire   @relation(fields: [memoireId], references: [id])
+  presidentId     String
+  president       User      @relation("JuryPresident", fields: [presidentId], references: [id])
+  rapporteurId    String
+  rapporteur      User      @relation("JuryRapporteur", fields: [rapporteurId], references: [id])
+  examinateurId   String
+  examinateur     User      @relation("JuryExaminateur", fields: [examinateurId], references: [id])
+}
+
+model Paiement {
+  id         String   @id @default(cuid())
+  montant    Float
+  reference  String
+  date       DateTime
+  status     String   @default("EN_ATTENTE") // EN_ATTENTE, VALIDE, REJETE
+  etudiantId String
+  etudiant   User     @relation(fields: [etudiantId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  titre     String
+  message   String
+  lu        Boolean  @default(false)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model HistoriqueMemoireStatus {
+  id          String    @id @default(uuid())
+  status      String
+  commentaire String?
+  createdAt   DateTime  @default(now())
+  
+  // Relations
+  memoireId   String
+  memoire     Memoire   @relation(fields: [memoireId], references: [id])
+}
