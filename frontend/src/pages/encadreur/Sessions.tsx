@@ -22,12 +22,14 @@ interface Session {
   titre: string;
   date: string;
   heure: string;
-  duree: string;
+  duree: number; // Changé de string à number
   type: 'PRESENTIEL' | 'VIRTUEL';
-  statut: 'A_VENIR' | 'EN_COURS' | 'TERMINEE';
+  statut: 'PLANIFIEE' | 'EN_COURS' | 'EFFECTUEE' | 'ANNULEE'; // Workflow complet
   etudiants: string[];
   lien?: string;
   salle?: string;
+  rapport?: string; // Ajouté
+  remarques?: string; // Ajouté
 }
 
 const Sessions = () => {
@@ -61,7 +63,7 @@ const Sessions = () => {
   };
 
   const handleStatusUpdate = async (id: string, data: {
-    status: string;
+    status: 'PLANIFIEE' | 'EN_COURS' | 'EFFECTUEE' | 'ANNULEE';
     rapport?: string;
     remarques?: string;
   }) => {
@@ -101,7 +103,7 @@ const Sessions = () => {
   };
 
   const getStatusCount = (status: string) => {
-    return sessions.filter(s => s.status === status).length;
+    return sessions.filter(s => s.statut === status).length;
   };
 
   const formatDate = (date: string) => {
@@ -117,7 +119,7 @@ const Sessions = () => {
   const formatDuree = (duree: number) => {
     const hours = Math.floor(duree / 60);
     const minutes = duree % 60;
-    return `${hours}h${minutes ? minutes : '00'}`;
+    return `${hours}h${minutes.toString().padStart(2, '0')}`;
   };
 
   const handleCreateSession = () => {
@@ -188,7 +190,7 @@ const Sessions = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Sessions à venir</p>
                   <p className="text-2xl font-bold text-blue-600 mt-2">
-                    {sessions.filter(s => s.statut === 'A_VENIR').length}
+                    {sessions.filter(s => s.statut === 'PLANIFIEE').length}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -309,7 +311,7 @@ const Sessions = () => {
                           </div>
                           <div>
                             <span className="text-gray-500">Durée:</span>
-                            <span className="ml-2 font-medium">{formatDuree(parseInt(session.duree))}</span>
+                            <span className="ml-2 font-medium">{formatDuree(session.duree)}</span>
                           </div>
                         </div>
                       </div>
@@ -338,12 +340,12 @@ const Sessions = () => {
                     <div className="text-sm space-y-2">
                       <div><span className="text-gray-500">Étudiants:</span> {selectedSession.etudiants.join(', ')}</div>
                       <div><span className="text-gray-500">Date:</span> {formatDate(selectedSession.date)}</div>
-                      <div><span className="text-gray-500">Durée:</span> {formatDuree(parseInt(selectedSession.duree))}</div>
+                      <div><span className="text-gray-500">Durée:</span> {formatDuree(selectedSession.duree)}</div>
                       <div><span className="text-gray-500">Type:</span> {selectedSession.type}</div>
                     </div>
                   </div>
 
-                  {selectedSession.statut === 'TERMINEE' && (
+                  {selectedSession.statut === 'EFFECTUEE' && (
                     <>
                       <div>
                         <h5 className="font-medium text-gray-900 mb-2">Rapport</h5>
@@ -356,7 +358,7 @@ const Sessions = () => {
                     </>
                   )}
 
-                  {selectedSession.statut === 'A_VENIR' && (
+                  {selectedSession.statut === 'PLANIFIEE' && (
                     <div className="flex space-x-2">
                       <Button 
                         onClick={() => handleStatusUpdate(selectedSession.id, { 
@@ -402,7 +404,7 @@ const Sessions = () => {
                       />
                       <Button 
                         onClick={() => handleStatusUpdate(selectedSession.id, {
-                          status: 'TERMINEE',
+                          status: 'EFFECTUEE',
                           rapport: selectedSession.rapport,
                           remarques: selectedSession.remarques
                         })}

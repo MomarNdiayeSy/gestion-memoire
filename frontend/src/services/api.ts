@@ -195,7 +195,7 @@ export const sessionApi = {
   update: async (id: string, data: {
     date?: string;
     duree?: number;
-    status?: 'PLANIFIEE' | 'EFFECTUEE' | 'ANNULEE';
+    status?: 'PLANIFIEE' | 'EN_COURS' | 'EFFECTUEE' | 'ANNULEE';
     rapport?: string;
     remarques?: string;
   }) => {
