@@ -18,8 +18,15 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
+import { useEffect } from 'react';
+
 const Sidebar = () => {
-  const { user } = useAuth();
+  const { user, token, checkAuth } = useAuth();
+  useEffect(() => {
+    if (!user) {
+      checkAuth();
+    }
+  }, [user, token, checkAuth]);
   const location = useLocation();
 
   const adminMenuItems = [
@@ -61,6 +68,15 @@ const Sidebar = () => {
         return [];
     }
   };
+
+  // Attendre que l'utilisateur soit chargé pour afficher la sidebar
+  if (!user) {
+    return (
+      <aside className="w-64 min-h-screen flex items-center justify-center">
+        <span className="text-sm text-gray-500">Chargement...</span>
+      </aside>
+    );
+  }
 
   const menuItems = getMenuItems();
 

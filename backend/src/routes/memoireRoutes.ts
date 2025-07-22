@@ -27,7 +27,7 @@ router.get('/:id', getMemoireById);
 router.patch('/:id/status', updateMemoireStatus);
 
 // Mettre à jour un mémoire (ETUDIANT propriétaire uniquement)
-router.put('/:id', checkRole(['ETUDIANT']), updateMemoire);
+router.put('/:id', checkRole(['ADMIN', 'ETUDIANT']), updateMemoire);
 
 // Ajouter un document au mémoire (ETUDIANT propriétaire uniquement)
 router.post('/:id/documents', checkRole(['ETUDIANT']), addDocument);

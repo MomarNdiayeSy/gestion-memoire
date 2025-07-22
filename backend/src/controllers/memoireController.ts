@@ -244,8 +244,9 @@ export const updateMemoireStatus = async (req: Request, res: Response) => {
 export const updateMemoire = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { titre, description, motsCles } = req.body;
+    const { titre, description, motsCles, dateDepot, dateSoutenance, status } = req.body;
     const userId = req.user?.userId;
+    const userRole = req.user?.role;
 
     const memoire = await prisma.memoire.findUnique({
       where: { id }
@@ -255,23 +256,28 @@ export const updateMemoire = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Mémoire non trouvé" });
     }
 
-    // Vérifier que c'est bien l'étudiant propriétaire
-    if (userId !== memoire.etudiantId) {
-      return res.status(403).json({ message: "Vous n'êtes pas autorisé à modifier ce mémoire" });
+    // Vérifier les permissions : l'étudiant propriétaire peut modifier son mémoire, l'ADMIN aussi
+    if (userRole !== 'ADMIN' && userId !== memoire.etudiantId) {
+      return res.status(403).json({ message: "Action non autorisée" });
     }
 
-    // Vérifier que le mémoire est modifiable
-    if (['VALIDE', 'SOUTENU'].includes(memoire.status)) {
+    // Vérifier que le mémoire est modifiable (sauf pour ADMIN)
+    if (['VALIDE', 'SOUTENU'].includes(memoire.status) && userRole !== 'ADMIN') {
       return res.status(400).json({ message: "Ce mémoire ne peut plus être modifié" });
     }
 
+    // Préparer le payload de mise à jour en ne gardant que les champs définis
+    const payload: any = {};
+    if (titre !== undefined) payload.titre = titre;
+    if (description !== undefined) payload.description = description;
+    if (motsCles !== undefined) payload.motsCles = motsCles;
+    if (dateDepot !== undefined) payload.dateDepot = dateDepot ? new Date(dateDepot) : null;
+    if (dateSoutenance !== undefined) payload.dateSoutenance = dateSoutenance ? new Date(dateSoutenance) : null;
+    if (status !== undefined) payload.status = status;
+
     const updatedMemoire = await prisma.memoire.update({
       where: { id },
-      data: {
-        titre,
-        description,
-        motsCles
-      }
+      data: payload
     });
 
     res.json(updatedMemoire);

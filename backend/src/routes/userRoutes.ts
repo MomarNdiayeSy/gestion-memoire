@@ -5,7 +5,10 @@ import {
   getUsers,
   getUserById,
   getEncadreurs,
-  getEtudiants
+  getEtudiants,
+  createUser,
+  updateUser,
+  deleteUser
 } from '../controllers/userController';
 import { authMiddleware, checkRole } from '../middleware/authMiddleware';
 
@@ -19,6 +22,11 @@ router.put('/password', authMiddleware, changePassword);
 router.get('/', authMiddleware, checkRole(['ADMIN']), getUsers);
 router.get('/encadreurs', authMiddleware, checkRole(['ADMIN', 'ETUDIANT']), getEncadreurs);
 router.get('/etudiants', authMiddleware, checkRole(['ADMIN', 'ENCADREUR']), getEtudiants);
+// Routes CRUD Admin
+router.post('/', authMiddleware, checkRole(['ADMIN']), createUser);
+router.put('/:id', authMiddleware, checkRole(['ADMIN']), updateUser);
+router.delete('/:id', authMiddleware, checkRole(['ADMIN']), deleteUser);
+
 router.get('/:id', authMiddleware, checkRole(['ADMIN']), getUserById);
 
 export default router; 

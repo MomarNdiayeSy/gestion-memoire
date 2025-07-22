@@ -71,6 +71,7 @@ export const sujetApi = {
     titre: string;
     description: string;
     motsCles: string[];
+    encadreurId?: string;
   }) => {
     const response = await api.post('/sujets', data);
     return response.data;
@@ -94,6 +95,7 @@ export const sujetApi = {
     titre: string;
     description: string;
     motsCles: string[];
+    encadreurId?: string;
   }) => {
     const response = await api.put(`/sujets/${id}`, data);
     return response.data;
@@ -139,9 +141,12 @@ export const memoireApi = {
 
   // Mettre à jour un mémoire
   update: async (id: string, data: {
-    titre: string;
-    description: string;
-    motsCles: string[];
+    titre?: string;
+    description?: string;
+    motsCles?: string[];
+    dateDepot?: string;
+    dateSoutenance?: string;
+    status?: 'EN_COURS' | 'SOUMIS' | 'EN_REVISION' | 'VALIDE' | 'REJETE' | 'SOUTENU';
   }) => {
     const response = await api.put(`/memoires/${id}`, data);
     return response.data;
@@ -163,6 +168,35 @@ export const memoireApi = {
     type: string;
   }) => {
     const response = await api.post(`/memoires/${id}/documents`, data);
+    return response.data;
+  }
+};
+
+export const userApi = {
+  getAll: async (params?: { role?: string }) => {
+    const query = new URLSearchParams(params).toString();
+    const response = await api.get(`/users${query ? `?${query}` : ''}`);
+    return response.data;
+  },
+  create: async (data: {
+    email: string;
+    password: string;
+    nom: string;
+    prenom: string;
+    telephone?: string;
+    role: 'ADMIN' | 'ENCADREUR' | 'ETUDIANT';
+    matricule?: string;
+    specialite?: string;
+  }) => {
+    const response = await api.post('/users', data);
+    return response.data;
+  },
+  update: async (id: string, data: { email?: string; nom?: string; prenom?: string; telephone?: string; role?: 'ADMIN' | 'ENCADREUR' | 'ETUDIANT'; matricule?: string; specialite?: string }) => {
+    const response = await api.put(`/users/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: string) => {
+    const response = await api.delete(`/users/${id}`);
     return response.data;
   }
 };

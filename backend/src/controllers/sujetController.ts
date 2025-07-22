@@ -6,14 +6,25 @@ const prisma = new PrismaClient();
 // Créer un nouveau sujet (ENCADREUR uniquement)
 export const createSujet = async (req: Request, res: Response) => {
   try {
-    const { titre, description, motsCles } = req.body;
-    const encadreurId = req.user?.userId;
+    const { titre, description, motsCles, encadreurId: bodyEncadreurId } = req.body;
+    let encadreurId: string | undefined;
+
+    if (req.user?.role === 'ADMIN') {
+      // L'admin doit préciser l'encadreur concerné
+      encadreurId = bodyEncadreurId;
+      if (!encadreurId) {
+        return res.status(400).json({ message: 'encadreurId requis' });
+      }
+    } else {
+      encadreurId = req.user?.userId;
+    }
 
     const sujet = await prisma.sujet.create({
       data: {
         titre,
         description,
         motsCles,
+        ...(req.user?.role === 'ADMIN' && bodyEncadreurId ? { encadreurId: bodyEncadreurId } : {}),
         status: "EN_ATTENTE",
         encadreurId: encadreurId!
       },
@@ -140,7 +151,7 @@ export const getSujetById = async (req: Request, res: Response) => {
 export const updateSujet = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { titre, description, motsCles } = req.body;
+    const { titre, description, motsCles, encadreurId: bodyEncadreurId } = req.body;
     const userId = req.user?.userId;
     const userRole = req.user?.role;
 

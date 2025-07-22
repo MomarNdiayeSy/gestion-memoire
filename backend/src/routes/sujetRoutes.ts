@@ -15,7 +15,7 @@ const router = Router();
 router.use(authMiddleware);
 
 // Créer un sujet (ENCADREUR uniquement)
-router.post('/', checkRole(['ENCADREUR']), createSujet);
+router.post('/', checkRole(['ENCADREUR', 'ADMIN']), createSujet);
 
 // Obtenir tous les sujets (accessible à tous les utilisateurs authentifiés)
 router.get('/', getSujets);

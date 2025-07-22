@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen, Search, Plus, Edit, Trash2, Filter, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { sujetApi } from '@/services/api';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { useQueryClient } from "@tanstack/react-query";
+import { sujetApi, userApi } from '@/services/api';
 import { toast } from 'sonner';
 
 interface Sujet {
@@ -16,6 +19,7 @@ interface Sujet {
   motsCles: string[];
   dateValidation?: Date;
   createdAt: Date;
+  encadreurId: string;
   encadreur: {
     nom: string;
     prenom: string;
@@ -35,10 +39,28 @@ const SubjectManagement = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [subjects, setSubjects] = useState<Sujet[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState<{ titre: string; description: string; motsCles: string; encadreurId: string }>({ titre: '', description: '', motsCles: '', encadreurId: '' });
+  const [createData, setCreateData] = useState<{ titre: string; description: string; motsCles: string; encadreurId: string }>({ titre: '', description: '', motsCles: '', encadreurId: '' });
+  const [encadreurs, setEncadreurs] = useState<Array<{ id: string; nom: string; prenom: string }>>([]);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     loadSujets();
   }, []);
+
+  useEffect(() => {
+    if (isCreateOpen || isModalOpen) {
+      userApi.getAll({ role: 'ENCADREUR' })
+        .then((data:any)=> {
+          const list = Array.isArray(data) ? data : data.users ?? [];
+          setEncadreurs(list);
+        })
+        .catch(() => toast.error('Erreur lors du chargement des encadreurs'));
+    }
+  }, [isCreateOpen]);
 
   const loadSujets = async () => {
     try {
@@ -50,6 +72,52 @@ const SubjectManagement = () => {
       toast.error('Erreur lors du chargement des sujets');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEditClick = (subject: Sujet) => {
+    if(!encadreurs.length){
+      userApi.getAll({ role: 'ENCADREUR' }).then((d:any)=>setEncadreurs(Array.isArray(d)?d:d.users??[]));
+    }
+    setEditingId(subject.id);
+    setFormData({ titre: subject.titre, description: subject.description, motsCles: subject.motsCles.join(', '), encadreurId: subject.encadreurId });
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Confirmer la suppression de ce sujet ?')) return;
+    try {
+      await sujetApi.delete(id);
+      toast.success('Sujet supprimé');
+      loadSujets();
+    } catch (err) {
+      toast.error('Erreur lors de la suppression');
+    }
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editingId) return;
+    const { titre, description, motsCles } = formData;
+    try {
+      await sujetApi.update(editingId, { titre, description, motsCles: motsCles.split(',').map(m => m.trim()), encadreurId: formData.encadreurId });
+      toast.success('Sujet mis à jour');
+      setIsModalOpen(false);
+      await loadSujets();
+    } catch (err) {
+      toast.error('Erreur lors de la mise à jour');
+    }
+  };
+
+  const handleCreateSubmit = async () => {
+    const { titre, description, motsCles, encadreurId } = createData;
+    try {
+      await sujetApi.create({ titre, description, motsCles: motsCles.split(',').map(m=>m.trim()), encadreurId });
+      toast.success('Sujet créé');
+      setIsCreateOpen(false);
+      setCreateData({ titre:'', description:'', motsCles:'', encadreurId:'' });
+      loadSujets();
+    } catch {
+      toast.error('Erreur création sujet');
     }
   };
 
@@ -104,7 +172,7 @@ const SubjectManagement = () => {
             <h1 className="text-3xl font-bold text-gray-900">Gestion des Sujets</h1>
             <p className="text-gray-600 mt-1">Validation et suivi des sujets de mémoire</p>
           </div>
-          <Button className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700">
+          <Button onClick={() => setIsCreateOpen(true)} className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700">
             <Plus className="mr-2 h-4 w-4" />
             Nouveau Sujet
           </Button>
@@ -265,6 +333,12 @@ const SubjectManagement = () => {
                     </div>
                   </div>
                   <div className="flex space-x-2">
+                    <Button size="icon" variant="outline" onClick={() => handleEditClick(subject)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="outline" onClick={() => handleDelete(subject.id)}>
+                      <Trash2 className="h-4 w-4 text-red-600" />
+                    </Button>
                     {subject.status === 'EN_ATTENTE' && (
                       <>
                         <Button 
@@ -293,8 +367,67 @@ const SubjectManagement = () => {
           )}
         </div>
       </div>
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier le sujet</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Titre"
+              value={formData.titre}
+              onChange={e => setFormData({ ...formData, titre: e.target.value })}
+            />
+            <Textarea
+              placeholder="Description"
+              value={formData.description}
+              onChange={e => setFormData({ ...formData, description: e.target.value })}
+            />
+            <Input
+              placeholder="Mots-clés (séparés par des virgules)"
+              value={formData.motsCles}
+              onChange={e => setFormData({ ...formData, motsCles: e.target.value })}
+            />
+            <select className="w-full border rounded p-2" value={formData.encadreurId} onChange={e=>setFormData({...formData, encadreurId:e.target.value})}>
+              <option value="">Choisir un encadreur</option>
+              {encadreurs.map(en=>(
+                <option key={en.id} value={en.id}>{en.prenom} {en.nom}</option>
+              ))}
+            </select>
+          </div>
+          <DialogFooter className="pt-4">
+            <Button onClick={handleEditSubmit}>Enregistrer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog création sujet */}
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nouveau sujet</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input placeholder="Titre" value={createData.titre} onChange={e=>setCreateData({...createData, titre:e.target.value})} />
+            <Textarea placeholder="Description" value={createData.description} onChange={e=>setCreateData({...createData, description:e.target.value})} />
+            <Input placeholder="Mots-clés (séparés par des virgules)" value={createData.motsCles} onChange={e=>setCreateData({...createData, motsCles:e.target.value})} />
+            <select className="w-full border rounded p-2" value={createData.encadreurId} onChange={e=>setCreateData({...createData, encadreurId:e.target.value})}>
+              <option value="">Choisir un encadreur</option>
+              {encadreurs.map(en=>(
+                <option key={en.id} value={en.id}>{en.prenom} {en.nom}</option>
+              ))}
+            </select>
+          </div>
+          <DialogFooter className="pt-4">
+            <Button onClick={handleCreateSubmit}>Créer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fin page */}
     </DashboardLayout>
-  );
+    );
 };
 
 export default SubjectManagement;

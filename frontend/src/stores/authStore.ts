@@ -56,15 +56,10 @@ const useAuthStore = create<AuthState>((set) => ({
 
   checkAuth: async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        set({ user: null, token: null, isAuthenticated: false });
-        return;
-      }
-
       const response = await api.get('/auth/me');
-      const { user } = response.data;
-      set({ user, isAuthenticated: true });
+      const received = response.data;
+      const currentUser = received.user ?? received;
+      set({ user: currentUser, isAuthenticated: true });
     } catch (error) {
       console.error('Check auth error:', error);
       localStorage.removeItem('token');

@@ -225,6 +225,135 @@ export const getEncadreurs = async (req: Request, res: Response) => {
 };
 
 // Liste des étudiants
+// Création d'un utilisateur (admin)
+export const createUser = async (req: Request, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    const { email, password, nom, prenom, telephone, role, matricule, specialite } = req.body;
+    if (!email || !password || !nom || !prenom || !role) {
+      return res.status(400).json({ message: 'Champs requis manquants' });
+    }
+
+    const allowedRoles = ['ADMIN', 'ENCADREUR', 'ETUDIANT'];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ message: 'Rôle invalide' });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return res.status(400).json({ message: 'Email déjà utilisé' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const data: any = {
+        email,
+        password: hashedPassword,
+        nom,
+        prenom,
+        telephone,
+        role,
+      };
+      if (role === 'ETUDIANT' && matricule) data.matricule = matricule;
+      if (role === 'ENCADREUR' && specialite) data.specialite = specialite;
+
+      const newUser = await prisma.user.create({
+        data,
+      select: {
+        id: true,
+        email: true,
+        nom: true,
+        prenom: true,
+        role: true,
+        telephone: true,
+        matricule: true,
+        specialite: true,
+        createdAt: true,
+      },
+    });
+
+    res.status(201).json({ message: 'Utilisateur créé', user: newUser });
+  } catch (error) {
+    console.error('Erreur createUser:', error);
+    res.status(500).json({ message: 'Une erreur est survenue' });
+  }
+};
+
+// Mise à jour d'un utilisateur (admin)
+export const updateUser = async (req: Request, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    const { id } = req.params;
+    const { email: newEmail, nom, prenom, telephone, role, matricule, specialite } = req.body;
+
+    // Si un nouvel email est fourni, vérifier son unicité
+    if (newEmail) {
+      const emailInUse = await prisma.user.findFirst({ where: { email: newEmail, id: { not: id } } });
+      if (emailInUse) {
+        return res.status(400).json({ message: 'Email déjà utilisé' });
+      }
+    }
+
+    // rôle optionnel mais s'il est fourni, vérifier qu'il est valide
+    const allowedRoles = ['ADMIN', 'ENCADREUR', 'ETUDIANT'];
+    if (role && !allowedRoles.includes(role)) {
+      return res.status(400).json({ message: 'Rôle invalide' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: {
+        nom,
+        prenom,
+        telephone,
+        ...(newEmail ? { email: newEmail } : {}),
+        ...(role ? { role } : {}),
+        ...(role === 'ETUDIANT' ? { matricule } : {}),
+        ...(role === 'ENCADREUR' ? { specialite } : {}),
+      },
+      select: {
+        id: true,
+        email: true,
+        nom: true,
+        prenom: true,
+        role: true,
+        telephone: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    res.json({ message: 'Utilisateur mis à jour', user: updatedUser });
+  } catch (error) {
+    console.error('Erreur updateUser:', error);
+    res.status(500).json({ message: 'Une erreur est survenue' });
+  }
+};
+
+// Suppression d'un utilisateur (admin)
+export const deleteUser = async (req: Request, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    const { id } = req.params;
+
+    await prisma.user.delete({ where: { id } });
+
+    res.json({ message: 'Utilisateur supprimé' });
+  } catch (error) {
+    console.error('Erreur deleteUser:', error);
+    res.status(500).json({ message: 'Une erreur est survenue' });
+  }
+};
+
 export const getEtudiants = async (req: Request, res: Response) => {
   try {
     if (!req.user || (req.user.role !== 'ADMIN' && req.user.role !== 'ENCADREUR')) {

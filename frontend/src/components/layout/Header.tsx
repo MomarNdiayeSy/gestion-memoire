@@ -13,8 +13,15 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import NotificationBell from './NotificationBell';
 
+import { useEffect } from 'react';
+
 const Header = () => {
-  const { user, logout } = useAuth();
+  const { user, token, checkAuth, logout } = useAuth();
+  useEffect(() => {
+    if (!user) {
+      checkAuth();
+    }
+  }, [user, token, checkAuth]);
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -29,6 +36,14 @@ const Header = () => {
       .join('')
       .toUpperCase();
   };
+
+  if (!user) {
+    return (
+      <header className="bg-white border-b border-gray-200 h-16 flex items-center px-6">
+        <span className="text-sm text-gray-500">Chargement...</span>
+      </header>
+    );
+  }
 
   return (
     <header className="bg-white border-b border-gray-200">

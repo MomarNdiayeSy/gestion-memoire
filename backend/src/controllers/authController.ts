@@ -88,10 +88,19 @@ export const login = async (req: Request, res: Response) => {
       { expiresIn: '24h' }
     );
 
+    // Envoyer le token dans un cookie httpOnly pour plus de sécurité
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 24h
+    });
+
     // Supprimer le mot de passe de la réponse
     const { password: _, ...userWithoutPassword } = user;
 
     res.json({
+      message: 'Connexion réussie',
       token,
       user: userWithoutPassword,
     });

@@ -151,9 +151,14 @@ const Sessions = () => {
   };
 
   const filteredSessions = sessions.filter(session => {
-    const matchesSearch = 
-      session.titre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      session.etudiants.some(e => e.toLowerCase().includes(searchTerm.toLowerCase()));
+    const lowerSearch = searchTerm.toLowerCase();
+
+    // Si aucun terme de recherche, on considère que la session correspond
+    const matchesSearch = lowerSearch === '' ? true : (
+      (session.titre?.toLowerCase().includes(lowerSearch) ?? false) ||
+      (session.etudiants?.some(e => e?.toLowerCase().includes(lowerSearch)) ?? false)
+    );
+
     const matchesType = filterType === 'all' || session.type === filterType;
     return matchesSearch && matchesType;
   });
@@ -296,7 +301,7 @@ const Sessions = () => {
                               {session.titre}
                             </h4>
                             <p className="text-sm text-gray-600">
-                              {session.etudiants.join(', ')}
+                              {(session.etudiants ?? []).join(', ')}
                             </p>
                           </div>
                           <Badge className={getStatusBadge(session.statut)}>
@@ -338,7 +343,7 @@ const Sessions = () => {
                       {selectedSession.titre}
                     </h4>
                     <div className="text-sm space-y-2">
-                      <div><span className="text-gray-500">Étudiants:</span> {selectedSession.etudiants.join(', ')}</div>
+                      <div><span className="text-gray-500">Étudiants:</span> {(selectedSession.etudiants ?? []).join(', ')}</div>
                       <div><span className="text-gray-500">Date:</span> {formatDate(selectedSession.date)}</div>
                       <div><span className="text-gray-500">Durée:</span> {formatDuree(selectedSession.duree)}</div>
                       <div><span className="text-gray-500">Type:</span> {selectedSession.type}</div>
