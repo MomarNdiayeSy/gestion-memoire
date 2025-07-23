@@ -1,93 +1,65 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { dashboardApi } from '@/services/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, BookOpen, GraduationCap, CreditCard, ChartBar, Clock, AlertCircle } from 'lucide-react';
+import { Users, BookOpen, GraduationCap, CreditCard, Clock, AlertCircle } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+
+
 import DashboardLayout from '../../components/layout/DashboardLayout';
 
 const AdminDashboard = () => {
-  const stats = [
-    {
-      title: "Utilisateurs",
-      value: "156",
-      description: "utilisateurs actifs",
-      icon: Users,
-      color: "from-blue-600 to-blue-700",
-      change: "+12% ce mois"
-    },
-    {
-      title: "Mémoires",
-      value: "85",
-      description: "en cours",
-      icon: BookOpen,
-      color: "from-green-600 to-green-700",
-      change: "+5% ce mois"
-    },
-    {
-      title: "Jurys",
-      value: "24",
-      description: "programmés",
-      icon: GraduationCap,
-      color: "from-purple-600 to-purple-700",
-      change: "+8% ce mois"
-    },
-    {
-      title: "Paiements",
-      value: "2.4M",
-      description: "FCFA collectés",
-      icon: CreditCard,
-      color: "from-orange-600 to-orange-700",
-      change: "+15% ce mois"
-    }
+  // Default static fallback
+  const fallbackStats = [
+    { title: 'Utilisateurs', value: '0', description: 'utilisateurs actifs', icon: Users, color: 'from-blue-600 to-blue-700', change: '' },
+    { title: 'Mémoires', value: '0', description: 'en cours', icon: BookOpen, color: 'from-green-600 to-green-700', change: '' },
+    { title: 'Jurys', value: '0', description: 'programmés', icon: GraduationCap, color: 'from-purple-600 to-purple-700', change: '' },
+    { title: 'Paiements', value: '0', description: 'FCFA collectés', icon: CreditCard, color: 'from-orange-600 to-orange-700', change: '' },
   ];
 
-  const recentActivities = [
-    {
-      type: "user",
-      message: "Nouvel encadreur ajouté",
-      details: "Dr. Ahmed Ben Ali - Département Informatique",
-      time: "Il y a 2h"
-    },
-    {
-      type: "payment",
-      message: "Paiement reçu",
-      details: "50,000 FCFA - Frais de soutenance",
-      time: "Il y a 3h"
-    },
-    {
-      type: "jury",
-      message: "Nouveau jury programmé",
-      details: "Salle A104 - 15 Mars 2024",
-      time: "Il y a 5h"
-    }
+  interface DashboardStats { users: number; memoires: number; jurys: number; montant: number; }
+  const { data: statsData } = useQuery<DashboardStats>({
+    queryKey: ['dashboard-stats'],
+    queryFn: dashboardApi.getStats,
+  });
+
+  const stats = React.useMemo(() => {
+    if (!statsData) return fallbackStats;
+    return [
+      { title: 'Utilisateurs', value: statsData.users.toString(), description: 'utilisateurs', icon: Users, color: 'from-blue-600 to-blue-700', change: '' },
+      { title: 'Mémoires', value: statsData.memoires.toString(), description: 'mémoires', icon: BookOpen, color: 'from-green-600 to-green-700', change: '' },
+      { title: 'Jurys', value: statsData.jurys.toString(), description: 'jurys', icon: GraduationCap, color: 'from-purple-600 to-purple-700', change: '' },
+      { title: 'Paiements', value: statsData.montant.toLocaleString('fr-FR').replace(/\s/g, '.'), description: 'FCFA collectés', icon: CreditCard, color: 'from-orange-600 to-orange-700', change: '' },
+    ];
+  }, [statsData]);
+
+  // Activities
+  type Activity = { type: string; message: string; details: string; createdAt?: string; time?: string };
+  const { data: activitiesData } = useQuery<Activity[]>({
+    queryKey: ['dashboard-activities'],
+    queryFn: dashboardApi.getActivities,
+  });
+
+  const recentActivities = activitiesData ?? [
+    { type: 'info', message: 'Pas d\'activité', details: '', time: '' },
   ];
 
-  const upcomingEvents = [
-    {
-      title: "Soutenance de Mémoire",
-      student: "Amine Trabelsi",
-      date: "15 Mars 2024",
-      time: "09:00",
-      location: "Salle A104",
-      status: "Confirmé"
-    },
-    {
-      title: "Réunion du Comité",
-      description: "Validation des sujets",
-      date: "16 Mars 2024",
-      time: "14:00",
-      location: "Salle de Conférence",
-      status: "En attente"
-    },
-    {
-      title: "Délibération",
-      description: "Session Février 2024",
-      date: "18 Mars 2024",
-      time: "10:00",
-      location: "Salle du Conseil",
-      status: "Planifié"
-    }
-  ];
+  // Events
+  type EventItem = {
+    title: string;
+    date: string;
+    time: string;
+    location: string;
+    status: string;
+    student?: string;
+    description?: string;
+  };
+  const { data: eventsData } = useQuery<EventItem[]>({
+    queryKey: ['dashboard-events'],
+    queryFn: dashboardApi.getEvents,
+  });
+
+  const upcomingEvents = eventsData ?? [];
 
   return (
     <DashboardLayout allowedRoles={['ADMIN']}>
@@ -98,10 +70,7 @@ const AdminDashboard = () => {
             <h1 className="text-3xl font-bold text-gray-900">Tableau de Bord Administrateur</h1>
             <p className="text-gray-600 mt-1">Supervision générale de la plateforme</p>
           </div>
-          <Button className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700">
-            <ChartBar className="mr-2 h-4 w-4" />
-            Rapport Mensuel
-          </Button>
+
         </div>
 
         {/* Stats Grid */}

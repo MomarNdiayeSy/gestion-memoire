@@ -1,4 +1,5 @@
 import React from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,103 +21,287 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CreditCard, Download, Filter, MoreVertical, Search } from 'lucide-react';
+import { CreditCard, Download, Filter, MoreVertical, Search, Plus } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import api, { paiementApi } from '@/services/api';
+import { jsPDF } from 'jspdf';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore – side-effect import to extend jsPDF prototype
+import autoTable from 'jspdf-autotable';
 
 interface Payment {
   id: string;
   etudiant: string;
   montant: number;
   date: string;
-  statut: 'EN_ATTENTE' | 'VALIDE' | 'REJETE';
+  status: 'EN_ATTENTE' | 'VALIDE' | 'REJETE';
   methode: string;
   reference: string;
 }
 
-const PaymentManagement = () => {
+interface AddPaymentFormProps {
+  onSuccess: () => void;
+}
+
+interface EditPaymentFormProps {
+  payment: Payment;
+  onClose: () => void;
+}
+
+const EditPaymentForm: React.FC<EditPaymentFormProps> = ({ payment, onClose }) => {
   const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = React.useState('');
-  const [filterStatus, setFilterStatus] = React.useState('all');
+  const queryClient = useQueryClient();
+  const [loading, setLoading] = React.useState(false);
 
-  // Données fictives pour les paiements
-  const [payments, setPayments] = React.useState<Payment[]>([
-    {
-      id: '1',
-      etudiant: 'Aminata Diallo',
-      montant: 150000,
-      date: '2024-03-15',
-      statut: 'VALIDE',
-      methode: 'Orange Money',
-      reference: 'PAY-2024-001'
-    },
-    {
-      id: '2',
-      etudiant: 'Moussa Sy',
-      montant: 150000,
-      date: '2024-03-14',
-      statut: 'EN_ATTENTE',
-      methode: 'Wave',
-      reference: 'PAY-2024-002'
-    },
-    {
-      id: '3',
-      etudiant: 'Fatou Ndiaye',
-      montant: 150000,
-      date: '2024-03-13',
-      statut: 'REJETE',
-      methode: 'Free Money',
-      reference: 'PAY-2024-003'
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    const payload: any = {
+      montant: Number(data.get('montant')),
+      date: String(data.get('date')),
+      methode: String(data.get('methode')),
+      status: String(data.get('status')),
+    };
+    const etu = data.get('etudiantId');
+    if (etu && typeof etu === 'string' && etu.trim() !== '') {
+      payload.etudiantId = etu;
     }
-  ]);
-
-  const stats = [
-    {
-      title: "Total Paiements",
-      value: "450,000 FCFA",
-      subtitle: "Ce mois"
-    },
-    {
-      title: "Paiements Validés",
-      value: "300,000 FCFA",
-      subtitle: "66.7% du total"
-    },
-    {
-      title: "En Attente",
-      value: "150,000 FCFA",
-      subtitle: "33.3% du total"
+    try {
+      setLoading(true);
+      await paiementApi.update(payment.id, payload);
+      toast({ title: 'Paiement mis à jour' });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['paymentStats'] });
+      onClose();
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err?.response?.data?.message || 'Une erreur est survenue', variant: 'destructive' });
+    } finally {
+      setLoading(false);
     }
-  ];
-
-  const handleValidatePayment = (paymentId: string) => {
-    setPayments(payments.map(payment => 
-      payment.id === paymentId 
-        ? { ...payment, statut: 'VALIDE' as const }
-        : payment
-    ));
-    toast({
-      title: "Paiement validé",
-      description: "Le paiement a été validé avec succès",
-    });
   };
 
-  const handleRejectPayment = (paymentId: string) => {
-    setPayments(payments.map(payment => 
-      payment.id === paymentId 
-        ? { ...payment, statut: 'REJETE' as const }
-        : payment
-    ));
-    toast({
-      title: "Paiement rejeté",
-      description: "Le paiement a été rejeté",
-    });
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <p className="text-sm text-gray-500">Référence : {payment.reference}</p>
+      <div>
+        <Label htmlFor="montant">Montant</Label>
+        <Input name="montant" type="number" defaultValue={payment.montant} required />
+      </div>
+      <div>
+        <Label htmlFor="date">Date</Label>
+        <Input name="date" type="date" defaultValue={payment.date.split('T')[0]} required />
+      </div>
+      <div>
+        <Label htmlFor="methode">Méthode</Label>
+        <Select name="methode" defaultValue={payment.methode}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ESPECE">Espèce</SelectItem>
+            <SelectItem value="ORANGE_MONEY">Orange Money</SelectItem>
+            <SelectItem value="WAVE">Wave</SelectItem>
+            <SelectItem value="YAS">Yas</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label htmlFor="status">Statut</Label>
+        <Select name="status" defaultValue={payment.status}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="EN_ATTENTE">En attente</SelectItem>
+            <SelectItem value="VALIDE">Validé</SelectItem>
+            <SelectItem value="REJETE">Rejeté</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <Button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-blue-600 to-violet-600 text-white">
+        {loading ? 'Enregistrement...' : 'Enregistrer'}
+      </Button>
+    </form>
+  );
+}
+
+interface AddPaymentFormProps {
+  onSuccess: () => void;
+}
+
+const AddPaymentForm: React.FC<AddPaymentFormProps> = ({ onSuccess }) => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [students, setStudents] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/users?role=ETUDIANT');
+        const list = Array.isArray(res.data) ? res.data : res.data?.users ?? [];
+        setStudents(list);
+      } catch {
+        setStudents([]);
+      }
+    })();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    const payload: any = {
+      montant: Number(data.get('montant')),
+      date: String(data.get('date')),
+      methode: String(data.get('methode')) as any,
+      etudiantId: String(data.get('etudiantId')),
+    };
+    try {
+      setLoading(true);
+      await paiementApi.create(payload as any);
+      toast({ title: 'Paiement ajouté' });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['paymentStats'] });
+      onSuccess();
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err?.response?.data?.message || 'Une erreur est survenue', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="etudiantId">Étudiant</Label>
+        <Select name="etudiantId" required>
+          <SelectTrigger>
+            <SelectValue placeholder="Choisir un étudiant" />
+          </SelectTrigger>
+          <SelectContent className="max-h-60 overflow-y-auto">
+            {students.map((s) => (
+              <SelectItem key={s.id} value={s.id}>{`${s.prenom} ${s.nom}`}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label htmlFor="montant">Montant</Label>
+        <Input name="montant" type="number" step="0.01" required />
+      </div>
+      <div>
+        <Label htmlFor="date">Date</Label>
+        <Input name="date" type="date" required />
+      </div>
+      <div>
+        <Label htmlFor="methode">Méthode</Label>
+        <Select name="methode" defaultValue="ESPECE">
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ESPECE">Espèce</SelectItem>
+            <SelectItem value="ORANGE_MONEY">Orange Money</SelectItem>
+            <SelectItem value="WAVE">Wave</SelectItem>
+            <SelectItem value="YAS">Yas</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <Button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white">
+        {loading ? 'Enregistrement...' : 'Enregistrer'}
+      </Button>
+    </form>
+  );
+}
+
+// -------------------
+// Page principale
+// -------------------
+const PaymentManagement = () => {
+  const { toast } = useToast();
+  const [openAdd, setOpenAdd] = React.useState(false);
+  const [editingPayment, setEditingPayment] = React.useState<Payment | null>(null);
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [filterStatus, setFilterStatus] = React.useState('all');
+  // Date range filters
+  const [startDate, setStartDate] = React.useState('');
+  const [endDate, setEndDate] = React.useState('');
+  const queryClient = useQueryClient();
+
+  // Fetch payments from API
+  const { data: payments = [], refetch } = useQuery<Payment[]>({
+    queryKey: ['payments', { status: filterStatus !== 'all' ? filterStatus : undefined }],
+    queryFn: () => paiementApi.getAll(filterStatus !== 'all' ? { status: filterStatus as any } : undefined),
+    select: (data: any[]) =>
+      data.map(p => ({
+        id: p.id,
+        etudiant: `${p.etudiant.prenom} ${p.etudiant.nom}`,
+        montant: p.montant,
+        date: p.date,
+        status: p.status,
+        methode: p.methode ?? '—',
+        reference: p.reference,
+      }))
+  });
+  
+
+  // Récupérer les statistiques des paiements
+  const { data: statsData } = useQuery<{ TOTAL: number; VALIDE: number; EN_ATTENTE: number; REJETE: number }>({
+    queryKey: ['paymentStats'],
+    queryFn: () => paiementApi.getStats(),
+  });
+
+  const stats = React.useMemo(() => {
+    if (!statsData) return [] as { title: string; value: string; subtitle: string }[];
+    return [
+      {
+        title: 'Paiements Validés',
+        value: `${statsData.VALIDE.toLocaleString()} FCFA`,
+        subtitle: '',
+      },
+      {
+        title: 'En Attente',
+        value: `${statsData.EN_ATTENTE.toLocaleString()} FCFA`,
+        subtitle: '',
+      },
+    ];
+  }, [statsData]);
+
+  const validateMutation = useMutation({
+    mutationFn: (id: string) => paiementApi.updateStatus(id, 'VALIDE'),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['paymentStats'] }); toast({ title: 'Paiement validé', description: 'Le paiement a été validé avec succès' }); }
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (id: string) => paiementApi.updateStatus(id, 'REJETE'),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['paymentStats'] }); toast({ title: 'Paiement rejeté', description: 'Le paiement a été rejeté' }); }
+  });
+
+  const handleValidatePayment = (paymentId: string) => {
+    validateMutation.mutate(paymentId);
+  };
+
+    const handleRejectPayment = (paymentId: string) => {
+    rejectMutation.mutate(paymentId);
   };
 
   const filteredPayments = payments.filter(payment => {
     const matchesSearch = 
       payment.etudiant.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.reference.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || payment.statut === filterStatus;
-    return matchesSearch && matchesStatus;
+    const matchesStatus = filterStatus === 'all' || payment.status === filterStatus;
+    const paymentDate = new Date(payment.date);
+    const matchesStart = startDate ? paymentDate >= new Date(startDate) : true;
+    const matchesEnd = endDate ? paymentDate <= new Date(endDate) : true;
+    const matchesDate = matchesStart && matchesEnd;
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
   const getStatusBadge = (status: string) => {
@@ -130,6 +315,63 @@ const PaymentManagement = () => {
     }
   };
 
+  const handleExportPdf = () => {
+    if (filteredPayments.length === 0) {
+      toast({ title: 'Aucun paiement à exporter', variant: 'destructive' });
+      return;
+    }
+    const doc = new jsPDF('p', 'pt');
+
+    // Header
+    const formatDateFr = (iso: string | undefined) => {
+      if (!iso) return '...';
+      const d = new Date(iso);
+      const day = d.getDate();
+      const dayStr = day === 1 ? '1er' : day.toString();
+      const month = d.toLocaleString('fr-FR', { month: 'long' });
+      const monthCap = month.charAt(0).toUpperCase() + month.slice(1);
+      return `${dayStr} ${monthCap} ${d.getFullYear()}`;
+    };
+
+    const rangeLabel = startDate || endDate
+      ? `du ${formatDateFr(startDate || '')} au ${formatDateFr(endDate || '')}`
+      : '– Tous les paiements –';
+
+    doc.setFontSize(14);
+    doc.text(`Rapport des Paiements ${rangeLabel}`, 40, 40);
+    let currentY = 60;
+
+    const total = filteredPayments.reduce((sum, p) => sum + p.montant, 0);
+
+    const formatAmount = (n: number) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+    // Table
+    autoTable(doc, {
+      startY: 80,
+      head: [['Référence', 'Étudiant', 'Montant (FCFA)', 'Date', 'Méthode', 'Statut']],
+      body: filteredPayments.map(p => [
+        p.reference,
+        p.etudiant,
+        formatAmount(p.montant),
+        new Date(p.date).toLocaleDateString(),
+        p.methode,
+        p.status,
+      ]),
+    });
+
+    // Total
+    const finalY = (doc as any).lastAutoTable.finalY || 100;
+    doc.setFontSize(12);
+    doc.text(`Montant total: ${formatAmount(total)} FCFA`, 40, finalY + 30);
+
+    try {
+      doc.save('paiements.pdf');
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Erreur lors de la génération du PDF', variant: 'destructive' });
+    }
+  };
+
   return (
     <DashboardLayout allowedRoles={['ADMIN']}>
       <div className="space-y-6">
@@ -139,14 +381,24 @@ const PaymentManagement = () => {
             <h1 className="text-3xl font-bold text-gray-900">Gestion des Paiements</h1>
             <p className="text-gray-600 mt-1">Gérez et suivez tous les paiements des étudiants</p>
           </div>
-          <Button className="bg-gradient-to-r from-blue-600 to-violet-600">
-            <Download className="mr-2 h-4 w-4" />
-            Exporter
-          </Button>
+          <div className="flex gap-2">
+            <Dialog open={openAdd} onOpenChange={setOpenAdd}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Ajouter un paiement</DialogTitle>
+                </DialogHeader>
+                <AddPaymentForm onSuccess={() => setOpenAdd(false)} />
+              </DialogContent>
+            </Dialog>
+            <Button onClick={handleExportPdf} className="bg-gradient-to-r from-blue-600 to-violet-600">
+              <Download className="mr-2 h-4 w-4" />
+              Exporter
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {stats.map((stat, index) => (
             <Card key={index} className="border-0 shadow-lg">
               <CardContent className="p-6">
@@ -164,6 +416,22 @@ const PaymentManagement = () => {
             </Card>
           ))}
         </div>
+
+        {/* Add Payment Modal */}
+        <Dialog open={openAdd} onOpenChange={setOpenAdd}>
+          <DialogTrigger asChild>
+            <Button variant="outline" onClick={() => setOpenAdd(true)} className="bg-gradient-to-r from-green-600 to-emerald-600 text-white">
+              <Plus className="mr-2 h-4 w-4" />
+              Ajouter un paiement
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Ajouter un paiement</DialogTitle>
+            </DialogHeader>
+            <AddPaymentForm onSuccess={() => { setOpenAdd(false); queryClient.invalidateQueries({ queryKey: ['payments'] }); queryClient.invalidateQueries({ queryKey: ['paymentStats'] }); }} />
+          </DialogContent>
+        </Dialog>
 
         {/* Filters and Search */}
         <Card className="border-0 shadow-lg">
@@ -200,6 +468,11 @@ const PaymentManagement = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              {/* Date range */}
+              <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+                <Input type="date" value={startDate} onChange={(e)=>setStartDate(e.target.value)} placeholder="Date début" />
+                <Input type="date" value={endDate} onChange={(e)=>setEndDate(e.target.value)} placeholder="Date fin" />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -231,8 +504,8 @@ const PaymentManagement = () => {
                     <TableCell>{new Date(payment.date).toLocaleDateString()}</TableCell>
                     <TableCell>{payment.methode}</TableCell>
                     <TableCell>
-                      <Badge className={getStatusBadge(payment.statut)}>
-                        {payment.statut}
+                      <Badge className={getStatusBadge(payment.status)}>
+                        {payment.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -245,8 +518,11 @@ const PaymentManagement = () => {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => handleValidatePayment(payment.id)}
+                          <DropdownMenuItem onClick={() => { setEditingPayment(payment); }}>
+                              Modifier
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                             onClick={() => handleValidatePayment(payment.id)}
                             className="text-green-600"
                           >
                             Valider
@@ -274,6 +550,17 @@ const PaymentManagement = () => {
           </CardContent>
         </Card>
       </div>
+    {/* Edit Payment Modal */}
+      {editingPayment && (
+        <Dialog open={true} onOpenChange={(v) => !v && setEditingPayment(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Modifier le paiement</DialogTitle>
+            </DialogHeader>
+            <EditPaymentForm payment={editingPayment} onClose={() => setEditingPayment(null)} />
+          </DialogContent>
+        </Dialog>
+      )}
     </DashboardLayout>
   );
 };

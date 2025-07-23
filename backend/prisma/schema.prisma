@@ -173,12 +173,20 @@ model Jury {
   encadreurJury3   User      @relation("JuryEncadreur3", fields: [encadreurJury3Id], references: [id])
 }
 
+enum PaymentMethod {
+  ESPECE
+  ORANGE_MONEY
+  WAVE
+  YAS
+}
+
 model Paiement {
   id         String   @id @default(cuid())
   montant    Float
   reference  String
   date       DateTime
   status     String   @default("EN_ATTENTE") // EN_ATTENTE, VALIDE, REJETE
+  methode    PaymentMethod @default(ESPECE)
   etudiantId String
   etudiant   User     @relation(fields: [etudiantId], references: [id])
   createdAt  DateTime @default(now())

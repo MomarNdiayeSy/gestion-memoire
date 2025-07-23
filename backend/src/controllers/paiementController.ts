@@ -6,14 +6,35 @@ const prisma = new PrismaClient();
 // Créer un nouveau paiement
 export const createPaiement = async (req: Request, res: Response) => {
   try {
-    const { montant, reference, date } = req.body;
-    const etudiantId = req.user?.userId;
+    let { montant, reference, date, methode } = req.body;
+    // Auto-generate reference if missing
+    if (!reference || reference.trim() === "") {
+      const year = new Date().getFullYear();
+      const startYear = new Date(`${year}-01-01T00:00:00Z`);
+      const nextYear = new Date(`${year + 1}-01-01T00:00:00Z`);
+      const count = await prisma.paiement.count({
+        where: {
+          date: {
+            gte: startYear,
+            lt: nextYear,
+          },
+        },
+      });
+      reference = `PAY-${year}-${String(count + 1).padStart(3, "0")}`;
+    }
+    let etudiantId = req.user?.userId;
+    const userRole = req.user?.role;
+    // Si l'admin fournit un etudiantId dans le body, l'utiliser
+    if (userRole === 'ADMIN' && req.body.etudiantId) {
+      etudiantId = req.body.etudiantId;
+    }
 
     const paiement = await prisma.paiement.create({
       data: {
         montant,
         reference,
         date: new Date(date),
+        methode: methode ?? 'ESPECE',
         status: 'EN_ATTENTE',
         etudiantId: etudiantId!
       },
@@ -121,6 +142,37 @@ export const getPaiementById = async (req: Request, res: Response) => {
   }
 };
 
+// Mettre à jour un paiement (admin uniquement)
+export const updatePaiement = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userRole = req.user?.role;
+    if (userRole !== 'ADMIN') {
+      return res.status(403).json({ message: 'Seul un administrateur peut modifier un paiement' });
+    }
+    const { montant, reference, date, methode, status, etudiantId } = req.body;
+    const data: any = {
+      montant,
+      reference,
+      methode,
+      status,
+    };
+    if (date) data.date = new Date(date);
+    // Only set etudiantId if non-empty string provided
+    if (etudiantId && typeof etudiantId === 'string' && etudiantId.trim() !== '') {
+      data.etudiantId = etudiantId;
+    }
+    const paiement = await prisma.paiement.update({
+      where: { id },
+      data,
+    });
+    res.json(paiement);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur lors de la mise à jour du paiement' });
+  }
+};
+
 // Mettre à jour le statut d'un paiement
 export const updatePaiementStatus = async (req: Request, res: Response) => {
   try {
@@ -160,6 +212,42 @@ export const updatePaiementStatus = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Erreur lors de la mise à jour du statut du paiement" });
+  }
+};
+
+// Obtenir des statistiques de paiement
+export const getPaiementStats = async (req: Request, res: Response) => {
+  try {
+    const userRole = req.user?.role;
+    if (userRole !== 'ADMIN') {
+      return res.status(403).json({ message: "Seul un administrateur peut consulter les statistiques de paiements" });
+    }
+
+    // Récupérer la somme des montants groupés par status
+    const grouped = await prisma.paiement.groupBy({
+      by: ['status'],
+      _sum: {
+        montant: true,
+      },
+    });
+
+    const stats: Record<string, number> = {
+      TOTAL: 0,
+      VALIDE: 0,
+      EN_ATTENTE: 0,
+      REJETE: 0,
+    };
+
+    grouped.forEach(g => {
+      const amount = g._sum.montant || 0;
+      stats[g.status as 'VALIDE' | 'EN_ATTENTE' | 'REJETE'] = amount;
+      stats.TOTAL += amount;
+    });
+
+    res.json(stats);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur lors de la récupération des statistiques de paiement" });
   }
 };
 

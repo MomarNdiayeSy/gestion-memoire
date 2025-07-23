@@ -60,9 +60,10 @@ const Header = () => {
           <NotificationBell />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+              <Button variant="ghost" className="flex items-center space-x-2 px-2">
+                <span className="text-sm font-medium text-gray-700 hidden sm:inline">{`${user.nom} ${user.prenom}`}</span>
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback>{user ? getInitials(user.nom + ' ' + user.prenom) : 'U'}</AvatarFallback>
+                  <AvatarFallback className="text-[10px]">{`${user.nom} ${user.prenom}`}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>

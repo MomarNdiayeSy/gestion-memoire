@@ -313,6 +313,18 @@ export const paiementApi = {
     return response.data;
   },
 
+  // Obtenir les statistiques des paiements
+  getStats: async () => {
+    const response = await api.get('/paiements/stats');
+    return response.data as { TOTAL: number; VALIDE: number; EN_ATTENTE: number; REJETE: number };
+  },
+
+  // Mettre à jour un paiement (admin)
+  update: async (id: string, data: { montant?: number; date?: string; methode?: string; status?: string; etudiantId?: string; }) => {
+    const response = await api.put(`/paiements/${id}`, data);
+    return response.data;
+  },
+
   // Mettre à jour le statut d'un paiement
   updateStatus: async (id: string, status: 'EN_ATTENTE' | 'VALIDE' | 'REJETE') => {
     const response = await api.patch(`/paiements/${id}/status`, { status });
@@ -324,6 +336,13 @@ export const paiementApi = {
     const response = await api.delete(`/paiements/${id}`);
     return response.data;
   }
+};
+
+// ---------- Dashboard API ----------
+export const dashboardApi = {
+  getStats: () => api.get('/admin/dashboard/stats').then(r => r.data),
+  getActivities: () => api.get('/admin/dashboard/activities').then(r => r.data),
+  getEvents: () => api.get('/admin/dashboard/events').then(r => r.data),
 };
 
 export const notificationApi = {

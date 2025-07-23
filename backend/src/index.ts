@@ -10,6 +10,7 @@ import sessionRoutes from './routes/sessionRoutes';
 import juryRoutes from './routes/juryRoutes';
 import paiementRoutes from './routes/paiementRoutes';
 import notificationRoutes from './routes/notificationRoutes';
+import dashboardRoutes from './routes/dashboardRoutes';
 
 // Initialize environment variables
 dotenv.config();
@@ -18,7 +19,7 @@ const app = express();
 
 // Configuration CORS
 app.use(cors({
-  origin: 'http://localhost:8080', // L'URL de votre frontend
+  origin: ['http://localhost:8080', 'http://localhost:5173'], // Frontend URLs (Vite dev & prod)
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -36,6 +37,7 @@ app.use('/api/memoires', memoireRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/jurys', juryRoutes);
 app.use('/api/paiements', paiementRoutes);
+app.use('/api/admin/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
 
 // Basic route
