@@ -47,6 +47,12 @@ enum PaiementStatus {
   REJETE
 }
 
+enum JuryStatus {
+  PLANIFIE
+  TERMINE
+  ANNULE
+}
+
 model User {
   id            String    @id @default(uuid())
   email         String    @unique
@@ -68,9 +74,9 @@ model User {
   sujetsEncadres      Sujet[]    @relation("EncadreurSujets")
   paiements           Paiement[]
   notifications       Notification[]
-  jurysPresident      Jury[]     @relation("JuryPresident")
-  jurysRapporteur     Jury[]     @relation("JuryRapporteur")
-  jurysExaminateur    Jury[]     @relation("JuryExaminateur")
+  jurysEncadreur1     Jury[]     @relation("JuryEncadreur1")
+  jurysEncadreur2     Jury[]     @relation("JuryEncadreur2")
+  jurysEncadreur3     Jury[]     @relation("JuryEncadreur3")
 }
 
 model Memoire {
@@ -149,20 +155,22 @@ model Document {
 
 model Jury {
   id              String    @id @default(uuid())
+  nom             String
   dateSoutenance  DateTime
   salle           String
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  statut          JuryStatus @default(PLANIFIE) // PLANIFIE, TERMINE, ANNULE
 
   // Relations
   memoireId       String    @unique
   memoire         Memoire   @relation(fields: [memoireId], references: [id])
-  presidentId     String
-  president       User      @relation("JuryPresident", fields: [presidentId], references: [id])
-  rapporteurId    String
-  rapporteur      User      @relation("JuryRapporteur", fields: [rapporteurId], references: [id])
-  examinateurId   String
-  examinateur     User      @relation("JuryExaminateur", fields: [examinateurId], references: [id])
+  encadreurJury1Id String
+  encadreurJury1   User      @relation("JuryEncadreur1", fields: [encadreurJury1Id], references: [id])
+  encadreurJury2Id String
+  encadreurJury2   User      @relation("JuryEncadreur2", fields: [encadreurJury2Id], references: [id])
+  encadreurJury3Id String
+  encadreurJury3   User      @relation("JuryEncadreur3", fields: [encadreurJury3Id], references: [id])
 }
 
 model Paiement {

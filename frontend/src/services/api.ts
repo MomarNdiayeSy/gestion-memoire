@@ -248,9 +248,9 @@ export const juryApi = {
   // Créer un nouveau jury
   create: async (data: {
     memoireId: string;
-    presidentId: string;
-    rapporteurId: string;
-    examinateurId: string;
+    encadreurJury1Id: string;
+    encadreurJury2Id: string;
+    encadreurJury3Id: string;
     dateSoutenance: string;
     salle: string;
   }) => {
@@ -272,9 +272,9 @@ export const juryApi = {
 
   // Mettre à jour un jury
   update: async (id: string, data: {
-    presidentId?: string;
-    rapporteurId?: string;
-    examinateurId?: string;
+    encadreurJury1Id?: string;
+    encadreurJury2Id?: string;
+    encadreurJury3Id?: string;
     dateSoutenance?: string;
     salle?: string;
   }) => {

@@ -1,9 +1,18 @@
 import React from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { juryApi, userApi, memoireApi } from '@/services/api';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -41,6 +50,24 @@ import {
 } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
 
+
+interface User {
+  id: string;
+  nom: string;
+  prenom: string;
+  role: 'ADMIN' | 'ENCADREUR' | 'ETUDIANT';
+}
+
+interface MemoireOption {
+  id: string;
+  titre: string;
+  etudiant: {
+    id: string;
+    nom: string;
+    prenom: string;
+  };
+}
+
 interface Jury {
   id: string;
   nom: string;
@@ -68,123 +95,84 @@ const JuryManagement = () => {
   const [isJuryDialogOpen, setIsJuryDialogOpen] = React.useState(false);
   const [editingJury, setEditingJury] = React.useState<Jury | null>(null);
 
-  // Données fictives pour les jurys
-  const [jurys, setJurys] = React.useState<Jury[]>([
-    {
-      id: '1',
-      nom: 'Jury - Gestion de Mémoires',
-      membres: [
-        {
-          id: '1',
-          nom: 'Diop',
-          prenom: 'Abdoulaye',
-          role: 'PRESIDENT',
-          specialite: 'Développement Web'
+  // Récupération des jurys depuis l'API
+  const { data: rawJurys = [], refetch } = useQuery<any[]>({
+    queryKey: ['jurys'],
+    queryFn: juryApi.getAll,
+    select: (data: any[]) =>
+      data.map((j: any) => ({
+        id: j.id,
+        nom: j.nom,
+        membres: [j.encadreurJury1, j.encadreurJury2, j.encadreurJury3].filter(Boolean),
+        soutenance: {
+          date: j.dateSoutenance,
+          heure: new Date(j.dateSoutenance).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+          salle: j.salle,
+          etudiant: `${j.memoire.etudiant.prenom} ${j.memoire.etudiant.nom}`,
+          sujet: j.memoire.titre,
         },
-        {
-          id: '2',
-          nom: 'Sow',
-          prenom: 'Mariama',
-          role: 'RAPPORTEUR',
-          specialite: 'Intelligence Artificielle'
-        },
-        {
-          id: '3',
-          nom: 'Fall',
-          prenom: 'Ibrahim',
-          role: 'EXAMINATEUR',
-          specialite: 'Base de données'
-        }
-      ],
-      soutenance: {
-        date: '2024-04-15',
-        heure: '10:00',
-        salle: 'Amphi A',
-        etudiant: 'Aminata Diallo',
-        sujet: 'Développement d\'une application de gestion de mémoires'
-      },
-      statut: 'PLANIFIE'
+        statut: j.statut,
+      })),
+  });
+
+  // Récupération des encadreurs (roll ENCADREUR)
+  const { data: encadreurs = [] } = useQuery<User[]>({
+    queryKey: ['encadreurs'],
+    queryFn: () => userApi.getAll({ role: 'ENCADREUR' }),
+  });
+
+  // Récupération des mémoires validés (étudiants) pour lesquels il n'y a pas encore de jury
+  const { data: memoires = [] } = useQuery<any[]>({
+    queryKey: ['memoires-valides'],
+    queryFn: () => memoireApi.getAll({ status: 'VALIDE' }),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => juryApi.create(data),
+    onSuccess: () => { toast({ title: 'Jury créé' }); refetch(); }
+  });
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: any }) => juryApi.update(id, payload),
+    onSuccess: () => { toast({ title: 'Jury modifié' }); refetch(); }
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => juryApi.delete(id),
+    onSuccess: () => {
+      refetch();
+      toast({ title: "Jury supprimé", description: "Le jury a été supprimé avec succès" });
     },
-    {
-      id: '2',
-      nom: 'Jury - Reconnaissance Faciale',
-      membres: [
-        {
-          id: '4',
-          nom: 'Ndiaye',
-          prenom: 'Fatou',
-          role: 'PRESIDENT',
-          specialite: 'Vision par ordinateur'
-        },
-        {
-          id: '5',
-          nom: 'Ba',
-          prenom: 'Ousmane',
-          role: 'RAPPORTEUR',
-          specialite: 'Machine Learning'
-        },
-        {
-          id: '6',
-          nom: 'Diallo',
-          prenom: 'Mamadou',
-          role: 'EXAMINATEUR',
-          specialite: 'Sécurité informatique'
-        }
-      ],
-      soutenance: {
-        date: '2024-04-20',
-        heure: '14:30',
-        salle: 'Salle de conférence',
-        etudiant: 'Moussa Sy',
-        sujet: 'Système de reconnaissance faciale pour la sécurité'
-      },
-      statut: 'PLANIFIE'
-    }
-  ]);
+  });
 
   const handleCreateJury = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    
+
+    const date = formData.get('date') as string;
+    const heure = formData.get('heure') as string;
+    const payload = {
+      nom: formData.get('nom') as string,
+      memoireId: formData.get('memoireId') as string,
+      encadreurJury1Id: formData.get('encadreur1') as string,
+      encadreurJury2Id: formData.get('encadreur2') as string,
+      encadreurJury3Id: formData.get('encadreur3') as string,
+      dateSoutenance: new Date(`${date}T${heure}:00`).toISOString(),
+      salle: formData.get('salle') as string,
+    statut: (formData.get('statut') as 'PLANIFIE' | 'TERMINE' | 'ANNULE') || 'PLANIFIE',
+    };
+
     if (editingJury) {
-      // Logique de modification
-      setJurys(jurys.map(j => j.id === editingJury.id ? {
-        ...editingJury,
-        // Mettre à jour avec les nouvelles valeurs
-      } : j));
-      toast({
-        title: "Jury modifié",
-        description: "Le jury a été modifié avec succès",
-      });
+      updateMutation.mutate({ id: editingJury.id, payload });
     } else {
-      // Logique de création
-      const newJury: Jury = {
-        id: (jurys.length + 1).toString(),
-        nom: formData.get('nom') as string,
-        membres: [],
-        soutenance: {
-          date: formData.get('date') as string,
-          heure: formData.get('heure') as string,
-          salle: formData.get('salle') as string,
-          etudiant: formData.get('etudiant') as string,
-          sujet: formData.get('sujet') as string
-        },
-        statut: 'PLANIFIE'
-      };
-      setJurys([...jurys, newJury]);
-      toast({
-        title: "Jury créé",
-        description: "Le nouveau jury a été créé avec succès",
-      });
+      createMutation.mutate(payload);
     }
-    
+
     setIsJuryDialogOpen(false);
     setEditingJury(null);
   };
 
   const handleDeleteJury = (juryId: string) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer ce jury ?')) {
-      setJurys(jurys.filter(j => j.id !== juryId));
+      deleteMutation.mutate(juryId);
       toast({
         title: "Jury supprimé",
         description: "Le jury a été supprimé avec succès",
@@ -192,14 +180,21 @@ const JuryManagement = () => {
     }
   };
 
+  // Sécuriser les données éventuellement non tableau
+  const safeEncadreurs = Array.isArray(encadreurs)
+    ? encadreurs
+    : (encadreurs && Array.isArray((encadreurs as any).users) ? (encadreurs as any).users : []);
+  const safeMemoires = Array.isArray(memoires) ? memoires : [];
+
+  const jurys = rawJurys as Jury[];
   const filteredJurys = jurys.filter(jury => {
-    const matchesSearch = 
-      jury.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      jury.soutenance.etudiant.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      jury.soutenance.sujet.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      jury.membres.some(m => 
-        `${m.prenom} ${m.nom}`.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+    const lowerSearch = searchTerm.toLowerCase();
+    const matchesSearch = [
+      jury.nom ?? '',
+      jury.soutenance?.etudiant ?? '',
+      jury.soutenance?.sujet ?? '',
+      ...(Array.isArray(jury.membres) ? jury.membres : []).map(m => `${m.prenom} ${m.nom}`)
+    ].some(text => text.toLowerCase().includes(lowerSearch));
     const matchesStatus = filterStatus === 'all' || jury.statut === filterStatus;
     return matchesSearch && matchesStatus;
   });
@@ -294,28 +289,57 @@ const JuryManagement = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium" htmlFor="etudiant">
+                  <label className="text-sm font-medium" htmlFor="memoireId">
                     Étudiant
                   </label>
-                  <Input
-                    id="etudiant"
-                    name="etudiant"
-                    defaultValue={editingJury?.soutenance.etudiant}
-                    placeholder="Nom de l'étudiant"
-                    required
-                  />
+                  <Select name="memoireId" defaultValue={editingJury?.id} required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir un mémoire" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {safeMemoires.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.etudiant.prenom} {m.etudiant.nom} – {m.titre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  {['encadreur1','encadreur2','encadreur3'].map((field, idx) => (
+                    <div className="space-y-2" key={field}>
+                      <label className="text-sm font-medium" htmlFor={field}>
+                        Encadreur {idx+1}
+                      </label>
+                      <Select name={field} required defaultValue={editingJury ? editingJury.membres[idx]?.id : undefined}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={`Choisir encadreur ${idx+1}`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {safeEncadreurs.map((e) => (
+                            <SelectItem key={e.id} value={e.id}>
+                              {e.prenom} {e.nom}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium" htmlFor="sujet">
-                    Sujet
+                  <label className="text-sm font-medium" htmlFor="statut">
+                    Statut
                   </label>
-                  <Input
-                    id="sujet"
-                    name="sujet"
-                    defaultValue={editingJury?.soutenance.sujet}
-                    placeholder="Sujet du mémoire"
-                    required
-                  />
+                  <Select name="statut" defaultValue={editingJury?.statut ?? 'PLANIFIE'} required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir un statut" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['PLANIFIE','TERMINE','ANNULE'].map(s => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="flex justify-end space-x-2">
                   <Button type="button" variant="outline" onClick={() => {
@@ -371,7 +395,7 @@ const JuryManagement = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Membres de Jury</p>
                   <p className="text-2xl font-bold text-purple-600 mt-2">
-                    {new Set(jurys.flatMap(j => j.membres.map(m => m.id))).size}
+                    {new Set(jurys.flatMap(j => (Array.isArray(j.membres) ? j.membres : []).map(m => m.id))).size}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -445,9 +469,9 @@ const JuryManagement = () => {
                     <TableCell className="font-medium">{jury.nom}</TableCell>
                     <TableCell>
                       <div>
-                        <p>{jury.soutenance.etudiant}</p>
+                        <p>{jury.soutenance?.etudiant ?? ''}</p>
                         <p className="text-sm text-gray-500 truncate max-w-xs">
-                          {jury.soutenance.sujet}
+                          {jury.soutenance?.sujet ?? ''}
                         </p>
                       </div>
                     </TableCell>
@@ -455,16 +479,16 @@ const JuryManagement = () => {
                       <div className="flex items-center space-x-2">
                         <Calendar className="h-4 w-4 text-gray-400" />
                         <span>
-                          {new Date(jury.soutenance.date).toLocaleDateString()}
+                          {jury.soutenance ? new Date(jury.soutenance.date).toLocaleDateString() : '-'}
                           <br />
-                          {jury.soutenance.heure}
+                          {jury.soutenance?.heure ?? ''}
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell>{jury.soutenance.salle}</TableCell>
+                    <TableCell>{jury.soutenance?.salle ?? ''}</TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        {jury.membres.map((membre) => (
+                        {(Array.isArray(jury.membres) ? jury.membres : []).map((membre) => (
                           <div key={membre.id} className="text-sm">
                             <span className="font-medium">
                               {membre.prenom} {membre.nom}

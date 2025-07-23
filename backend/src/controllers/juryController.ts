@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 // Créer un nouveau jury
 export const createJury = async (req: Request, res: Response) => {
   try {
-    const { memoireId, presidentId, rapporteurId, examinateurId, dateSoutenance, salle } = req.body;
+    const { nom, memoireId, encadreurJury1Id, encadreurJury2Id, encadreurJury3Id, dateSoutenance, salle, statut = 'PLANIFIE' } = req.body;
 
     // Vérifier si un jury existe déjà pour ce mémoire
     const existingJury = await prisma.jury.findUnique({
@@ -19,19 +19,32 @@ export const createJury = async (req: Request, res: Response) => {
 
     // Vérifier si le mémoire existe et est en état VALIDE
     const memoire = await prisma.memoire.findUnique({
-      where: { id: memoireId }
+      where: { id: memoireId },
+      include: {
+        etudiant: {
+          select: { nom: true, prenom: true }
+        }
+      }
     });
 
     if (!memoire || memoire.status !== 'VALIDE') {
       return res.status(400).json({ message: "Le mémoire doit être validé avant d'assigner un jury" });
     }
 
+    // Utiliser le nom fourni ou, à défaut, générer un nom par défaut basé sur l'étudiant
+    const juryName = nom && nom.trim().length > 0
+      ? nom.trim()
+      : (memoire && memoire.etudiant
+          ? `Jury – ${memoire.etudiant.prenom} ${memoire.etudiant.nom}`
+          : 'Jury');
+
     const jury = await prisma.jury.create({
       data: {
+        nom: juryName,
         memoireId,
-        presidentId,
-        rapporteurId,
-        examinateurId,
+        encadreurJury1Id,
+        encadreurJury2Id,
+        encadreurJury3Id,
         dateSoutenance: new Date(dateSoutenance),
         salle
       },
@@ -46,21 +59,21 @@ export const createJury = async (req: Request, res: Response) => {
             }
           }
         },
-        president: {
+        encadreurJury1: {
           select: {
             nom: true,
             prenom: true,
             specialite: true
           }
         },
-        rapporteur: {
+        encadreurJury2: {
           select: {
             nom: true,
             prenom: true,
             specialite: true
           }
         },
-        examinateur: {
+        encadreurJury3: {
           select: {
             nom: true,
             prenom: true,
@@ -110,21 +123,21 @@ export const getJurys = async (req: Request, res: Response) => {
             }
           }
         },
-        president: {
+        encadreurJury1: {
           select: {
             nom: true,
             prenom: true,
             specialite: true
           }
         },
-        rapporteur: {
+        encadreurJury2: {
           select: {
             nom: true,
             prenom: true,
             specialite: true
           }
         },
-        examinateur: {
+        encadreurJury3: {
           select: {
             nom: true,
             prenom: true,
@@ -162,21 +175,21 @@ export const getJuryById = async (req: Request, res: Response) => {
             }
           }
         },
-        president: {
+        encadreurJury1: {
           select: {
             nom: true,
             prenom: true,
             specialite: true
           }
         },
-        rapporteur: {
+        encadreurJury2: {
           select: {
             nom: true,
             prenom: true,
             specialite: true
           }
         },
-        examinateur: {
+        encadreurJury3: {
           select: {
             nom: true,
             prenom: true,
@@ -201,14 +214,15 @@ export const getJuryById = async (req: Request, res: Response) => {
 export const updateJury = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { presidentId, rapporteurId, examinateurId, dateSoutenance, salle } = req.body;
+    const { nom, encadreurJury1Id, encadreurJury2Id, encadreurJury3Id, dateSoutenance, salle, statut } = req.body;
 
     const jury = await prisma.jury.update({
       where: { id },
       data: {
-        presidentId,
-        rapporteurId,
-        examinateurId,
+        nom,
+        encadreurJury1Id,
+        encadreurJury2Id,
+        encadreurJury3Id,
         dateSoutenance: new Date(dateSoutenance),
         salle
       },
@@ -223,21 +237,21 @@ export const updateJury = async (req: Request, res: Response) => {
             }
           }
         },
-        president: {
+        encadreurJury1: {
           select: {
             nom: true,
             prenom: true,
             specialite: true
           }
         },
-        rapporteur: {
+        encadreurJury2: {
           select: {
             nom: true,
             prenom: true,
             specialite: true
           }
         },
-        examinateur: {
+        encadreurJury3: {
           select: {
             nom: true,
             prenom: true,
