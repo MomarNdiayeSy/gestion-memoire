@@ -4,72 +4,77 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Search, Download, Eye, Filter, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { FileText, Search, Download, Eye, Filter, CheckCircle, Clock, XCircle, Edit, Award } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { memoireApi } from '@/services/api';
 
 const Memoires = () => {
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
-  const memoires = [
-    {
-      id: 1,
-      titre: "Système de Recommandation Intelligent",
-      etudiant: "Marie Dupont",
-      sujet: "Intelligence Artificielle et Machine Learning",
-      statut: "déposé",
-      dateDepot: "2024-03-15",
-      fichier: "memoire_marie_dupont.pdf",
-      taille: "2.5 MB",
-      progression: 100
-    },
-    {
-      id: 2,
-      titre: "Application E-commerce Mobile",
-      etudiant: "Amine Trabelsi",
-      sujet: "Développement Mobile",
-      statut: "en_cours",
-      dateDepot: null,
-      fichier: null,
-      taille: null,
-      progression: 75
-    },
-    {
-      id: 3,
-      titre: "Analyse de Vulnérabilités Web",
-      etudiant: "Fatma Zahra",
-      sujet: "Cybersécurité",
-      statut: "validé",
-      dateDepot: "2024-02-28",
-      fichier: "memoire_fatma_zahra.pdf",
-      taille: "3.1 MB",
-      progression: 100
-    }
-  ];
+  const { data: memoires = [], isFetching } = useQuery<any[]>({
+    queryKey: ['encadreur-memoires'],
+    queryFn: () => memoireApi.getAll(),
+  });
 
-  const getStatusBadge = (statut: string) => {
-    const styles = {
-      'en_cours': 'bg-blue-100 text-blue-800',
-      'déposé': 'bg-yellow-100 text-yellow-800',
-      'validé': 'bg-green-100 text-green-800',
-      'refusé': 'bg-red-100 text-red-800'
+  /* ------------------------- Mutation accept/refuse ------------------------- */
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'VALIDE' | 'REJETE' }) => memoireApi.updateStatus(id, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['encadreur-memoires'] });
+    },
+  });
+
+  // Helpers utilitaires pour l’affichage des statuts
+  const getStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      EN_COURS: 'bg-blue-100 text-blue-800',
+      SOUMIS: 'bg-yellow-100 text-yellow-800',
+      EN_REVISION: 'bg-orange-100 text-orange-800',
+      VALIDE: 'bg-green-100 text-green-800',
+      REJETE: 'bg-red-100 text-red-800',
+      SOUTENU: 'bg-purple-100 text-purple-800',
     };
-    return styles[statut as keyof typeof styles];
+    return (styles as any)[status] ?? 'bg-gray-100 text-gray-800';
   };
 
-  const getStatusIcon = (statut: string) => {
-    switch (statut) {
-      case 'en_cours': return <Clock className="h-4 w-4" />;
-      case 'déposé': return <FileText className="h-4 w-4" />;
-      case 'validé': return <CheckCircle className="h-4 w-4" />;
-      case 'refusé': return <XCircle className="h-4 w-4" />;
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'EN_COURS': return <Clock className="h-4 w-4" />;
+      case 'SOUMIS': return <FileText className="h-4 w-4" />;
+      case 'EN_REVISION': return <Edit className="h-4 w-4" />;
+      case 'VALIDE': return <CheckCircle className="h-4 w-4" />;
+      case 'REJETE': return <XCircle className="h-4 w-4" />;
+      case 'SOUTENU': return <Award className="h-4 w-4" />;
+      default: return null;
+    }
+  };
+
+  const getProgress = (status: string): number => {
+    switch (status) {
+      case 'EN_COURS':
+        return 25;
+      case 'SOUMIS':
+        return 50;
+      case 'EN_REVISION':
+        return 75;
+      case 'SOUTENU':
+        return 100;
+      case 'VALIDE':
+        return 100;
+      default:
+        return 0;
     }
   };
 
   const filteredMemoires = memoires.filter(memoire => {
+    const étudiantNomComplet = `${memoire.etudiant?.prenom ?? ''} ${memoire.etudiant?.nom ?? ''}`.toLowerCase();
+    const sujetTitre = memoire.sujet?.titre?.toLowerCase() ?? '';
     const matchesSearch = memoire.titre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         memoire.etudiant.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         memoire.sujet.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || memoire.statut === filterStatus;
+                         étudiantNomComplet.includes(searchTerm.toLowerCase()) ||
+                          sujetTitre.includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'all' || memoire.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
@@ -85,7 +90,7 @@ const Memoires = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -103,7 +108,7 @@ const Memoires = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">En cours</p>
                   <p className="text-2xl font-bold text-blue-600">
-                    {memoires.filter(m => m.statut === 'en_cours').length}
+                    {memoires.filter(m => m.status === 'EN_COURS').length}
                   </p>
                 </div>
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
@@ -118,7 +123,7 @@ const Memoires = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Déposés</p>
                   <p className="text-2xl font-bold text-yellow-600">
-                    {memoires.filter(m => m.statut === 'déposé').length}
+                    {memoires.filter(m => m.status === 'SOUMIS').length}
                   </p>
                 </div>
                 <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
@@ -133,11 +138,41 @@ const Memoires = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Validés</p>
                   <p className="text-2xl font-bold text-green-600">
-                    {memoires.filter(m => m.statut === 'validé').length}
+                    {memoires.filter(m => m.status === 'VALIDE').length}
                   </p>
                 </div>
                 <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
                   <CheckCircle className="h-4 w-4 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Refusés</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {memoires.filter(m => m.status === 'REJETE').length}
+                  </p>
+                </div>
+                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                  <XCircle className="h-4 w-4 text-red-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Soutenus</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {memoires.filter(m => m.status === 'SOUTENU').length}
+                  </p>
+                </div>
+                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                  <Award className="h-4 w-4 text-purple-600" />
                 </div>
               </div>
             </CardContent>
@@ -169,23 +204,42 @@ const Memoires = () => {
                   Tous
                 </Button>
                 <Button
-                  variant={filterStatus === 'en_cours' ? 'default' : 'outline'}
-                  onClick={() => setFilterStatus('en_cours')}
+                  variant={filterStatus === 'EN_COURS' ? 'default' : 'outline'}
+                  onClick={() => setFilterStatus('EN_COURS')}
                 >
                   En cours
                 </Button>
                 <Button
-                  variant={filterStatus === 'déposé' ? 'default' : 'outline'}
-                  onClick={() => setFilterStatus('déposé')}
+                  variant={filterStatus === 'SOUMIS' ? 'default' : 'outline'}
+                  onClick={() => setFilterStatus('SOUMIS')}
                 >
                   Déposés
                 </Button>
                 <Button
-                  variant={filterStatus === 'validé' ? 'default' : 'outline'}
-                  onClick={() => setFilterStatus('validé')}
+                  variant={filterStatus === 'VALIDE' ? 'default' : 'outline'}
+                  onClick={() => setFilterStatus('VALIDE')}
                 >
                   Validés
                 </Button>
+                <Button
+                  variant={filterStatus === 'EN_REVISION' ? 'default' : 'outline'}
+                  onClick={() => setFilterStatus('EN_REVISION')}
+                >
+                  En révision
+                </Button>
+                <Button
+                  variant={filterStatus === 'REJETE' ? 'default' : 'outline'}
+                  onClick={() => setFilterStatus('REJETE')}
+                >
+                  Refusés
+                </Button>
+                <Button
+                  variant={filterStatus === 'SOUTENU' ? 'default' : 'outline'}
+                  onClick={() => setFilterStatus('SOUTENU')}
+                >
+                  Soutenus
+                </Button>
+
               </div>
             </div>
           </CardContent>
@@ -209,18 +263,18 @@ const Memoires = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-gray-500">Étudiant:</span>
-                          <p className="font-medium text-gray-900">{memoire.etudiant}</p>
+                          <p className="font-medium text-gray-900">{`${memoire.etudiant?.prenom} ${memoire.etudiant?.nom}`}</p>
                         </div>
                         <div>
                           <span className="text-gray-500">Sujet:</span>
-                          <p className="font-medium text-gray-900">{memoire.sujet}</p>
+                          <p className="font-medium text-gray-900">{memoire.sujet?.titre}</p>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Badge className={getStatusBadge(memoire.statut)}>
-                        {getStatusIcon(memoire.statut)}
-                        <span className="ml-1 capitalize">{memoire.statut.replace('_', ' ')}</span>
+                      <Badge className={getStatusBadge(memoire.status)}>
+                        {getStatusIcon(memoire.status)}
+                        <span className="ml-1 capitalize">{memoire.status.replace('_', ' ')}</span>
                       </Badge>
                     </div>
                   </div>
@@ -229,12 +283,12 @@ const Memoires = () => {
                   <div className="mb-4">
                     <div className="flex items-center justify-between text-sm mb-2">
                       <span className="text-gray-600">Progression</span>
-                      <span className="font-medium text-gray-900">{memoire.progression}%</span>
+                      <span className="font-medium text-gray-900">{getProgress(memoire.status)}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
                         className="bg-gradient-to-r from-blue-600 to-violet-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${memoire.progression}%` }}
+                        style={{ width: `${getProgress(memoire.status)}%` }}
                       />
                     </div>
                   </div>
@@ -242,18 +296,40 @@ const Memoires = () => {
                   {/* File Info and Actions */}
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-600">
-                      {memoire.fichier ? (
+                      {memoire.documents && memoire.documents.length ? (
                         <div className="flex items-center space-x-4">
-                          <span>Fichier: {memoire.fichier}</span>
-                          <span>Taille: {memoire.taille}</span>
-                          <span>Déposé le: {memoire.dateDepot}</span>
+                          <span>Fichier: {memoire.documents[0]?.nom ?? '—'}</span>
+                          <span>Taille: {memoire.documents[0]?.taille ?? 'Taille inconnue'}</span>
+                          <span>Déposé le: {memoire.documents[0]?.createdAt ? new Date(memoire.documents[0].createdAt).toLocaleDateString() : '—'}</span>
                         </div>
                       ) : (
                         <span className="text-orange-600">Aucun fichier déposé</span>
                       )}
                     </div>
                     <div className="flex space-x-2">
-                      {memoire.fichier && (
+                      {memoire.status === 'SOUMIS' && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            disabled={updateStatusMutation.isPending}
+                            onClick={() => updateStatusMutation.mutate({ id: memoire.id, status: 'VALIDE' })}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Accepter
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={updateStatusMutation.isPending}
+                            onClick={() => updateStatusMutation.mutate({ id: memoire.id, status: 'REJETE' })}
+                          >
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Refuser
+                          </Button>
+                        </>
+                      )}
+                      {memoire.documents && memoire.documents.length && (
                         <>
                           <Button variant="outline" size="sm">
                             <Eye className="h-4 w-4 mr-2" />
@@ -277,4 +353,4 @@ const Memoires = () => {
   );
 };
 
-export default Memoires; 
+export default Memoires;

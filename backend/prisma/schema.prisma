@@ -92,6 +92,7 @@ model Memoire {
   mention         String?       // Mention obtenue
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  progression Int @default(0)
 
   // Relations
   etudiantId      String       @unique

@@ -147,6 +147,7 @@ export const memoireApi = {
     dateDepot?: string;
     dateSoutenance?: string;
     status?: 'EN_COURS' | 'SOUMIS' | 'EN_REVISION' | 'VALIDE' | 'REJETE' | 'SOUTENU';
+    progression?: number;
   }) => {
     const response = await api.put(`/memoires/${id}`, data);
     return response.data;

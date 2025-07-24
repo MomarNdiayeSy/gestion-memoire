@@ -1,4 +1,6 @@
 import React from 'react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { memoireApi } from '@/services/api';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,15 +33,50 @@ import {
 } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
 
+type MemoireStatus = 'EN_COURS' | 'SOUMIS' | 'EN_REVISION' | 'VALIDE' | 'REJETE' | 'SOUTENU';
+
+interface Memoire {
+  id: string;
+  status: MemoireStatus;
+  updatedAt: string;
+  progression?: number;
+  etudiant?: {
+    id?: string;
+    nom?: string;
+    prenom?: string;
+    email?: string;
+  };
+  sujet?: {
+    titre?: string;
+  };
+}
+
 interface Student {
   id: string;
+  memoireId: string;
   nom: string;
   prenom: string;
   email: string;
   sujet: string;
   progression: number;
-  statut: 'ACTIF' | 'EN_PAUSE' | 'TERMINE';
+  statut: MemoireStatus;
   derniereMaj: string;
+}
+
+interface LocalMemoire {
+  id: string;
+  status: MemoireStatus;
+  updatedAt: string;
+  progression?: number;
+  etudiant?: {
+    id?: string;
+    nom?: string;
+    prenom?: string;
+    email?: string;
+  };
+  sujet?: {
+    titre?: string;
+  };
 }
 
 const MyStudents = () => {
@@ -47,39 +84,44 @@ const MyStudents = () => {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [filterStatus, setFilterStatus] = React.useState('all');
 
-  // Données fictives pour les étudiants
-  const [students, setStudents] = React.useState<Student[]>([
-    {
-      id: '1',
-      nom: 'Diallo',
-      prenom: 'Aminata',
-      email: 'aminata.diallo@example.com',
-      sujet: 'Développement d\'une application de gestion de mémoires',
-      progression: 75,
-      statut: 'ACTIF',
-      derniereMaj: '2024-03-15'
-    },
-    {
-      id: '2',
-      nom: 'Sy',
-      prenom: 'Moussa',
-      email: 'moussa.sy@example.com',
-      sujet: 'Plateforme e-learning intelligente',
-      progression: 45,
-      statut: 'ACTIF',
-      derniereMaj: '2024-03-14'
-    },
-    {
-      id: '3',
-      nom: 'Ndiaye',
-      prenom: 'Fatou',
-      email: 'fatou.ndiaye@example.com',
-      sujet: 'Système de reconnaissance faciale',
-      progression: 100,
-      statut: 'TERMINE',
-      derniereMaj: '2024-03-10'
-    }
-  ]);
+  const queryClient = useQueryClient();
+
+  // Récupération des mémoires encadrés
+  const { data: memoires = [], isFetching } = useQuery<LocalMemoire[]>({
+    queryKey: ['encadreur-memoires'],
+    queryFn: () => memoireApi.getAll(),
+  });
+
+  // Fonction utilitaire pour déterminer la progression par défaut selon le statut
+function getDefaultProgression(status: MemoireStatus): number {
+  const progressMap: Record<MemoireStatus, number> = {
+    EN_COURS: 25,
+    SOUMIS: 50,
+    EN_REVISION: 75,
+    VALIDE: 100,
+    SOUTENU: 100,
+    REJETE: 0,
+  } as const;
+  return progressMap[status] ?? 25;
+}
+
+// Transformation des mémoires en liste d'étudiants
+  const students: Student[] = React.useMemo(() => {
+    return memoires.map((memoire) => ({
+      id: memoire.etudiant?.id || '',
+      memoireId: memoire.id,
+      nom: memoire.etudiant?.nom || 'Inconnu',
+      prenom: memoire.etudiant?.prenom || '',
+      email: memoire.etudiant?.email || '',
+      sujet: memoire.sujet?.titre || 'Sans sujet',
+      progression:
+        ((memoire as any).progression === 0 && ['VALIDE', 'SOUTENU'].includes(memoire.status))
+          ? 100
+          : ( (memoire as any).progression ?? getDefaultProgression(memoire.status) ),
+      statut: memoire.status,
+      derniereMaj: new Date(memoire.updatedAt).toISOString().split('T')[0],
+    }));
+  }, [memoires]);
 
   const stats = [
     {
@@ -90,31 +132,38 @@ const MyStudents = () => {
     },
     {
       title: "Étudiants Actifs",
-      value: students.filter(s => s.statut === 'ACTIF').length.toString(),
+      value: students.filter(s => s.statut !== 'VALIDE' && s.statut !== 'SOUTENU').length.toString(),
       icon: GraduationCap,
       color: "green"
     },
     {
       title: "Mémoires Terminés",
-      value: students.filter(s => s.statut === 'TERMINE').length.toString(),
+      value: students.filter(s => s.statut === 'VALIDE' || s.statut === 'SOUTENU').length.toString(),
       icon: BookOpen,
       color: "purple"
     }
   ];
 
-  const handleUpdateProgress = (studentId: string, newProgress: number) => {
-    setStudents(students.map(student => 
-      student.id === studentId 
-        ? { 
-            ...student, 
-            progression: newProgress,
-            derniereMaj: new Date().toISOString().split('T')[0]
-          }
-        : student
-    ));
+  const updateProgressMutation = useMutation({
+    mutationFn: ({ memoireId, progression }: { memoireId: string; progression: number }) =>
+      memoireApi.update(memoireId, { progression }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['encadreur-memoires'] });
+    },
+  });
+
+  const handleUpdateProgress = (memoireId: string, increment: number) => {
+    const memoire = memoires.find(m => m.id === memoireId);
+    if (!memoire) return;
+    
+    const currentProgress = (memoire as any).progression ?? getDefaultProgression(memoire.status);
+    const newProgress = Math.min(100, Math.max(0, currentProgress + increment));
+    
+    updateProgressMutation.mutate({ memoireId, progression: newProgress });
+    
     toast({
-      title: "Progression mise à jour",
-      description: "La progression a été mise à jour avec succès",
+      title: 'Progression mise à jour',
+      description: `Progression mise à jour à ${newProgress}%`,
     });
   };
 
@@ -129,14 +178,20 @@ const MyStudents = () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'ACTIF':
-        return "bg-green-100 text-green-800";
-      case 'EN_PAUSE':
-        return "bg-yellow-100 text-yellow-800";
-      case 'TERMINE':
-        return "bg-blue-100 text-blue-800";
+      case 'EN_COURS':
+        return 'bg-blue-100 text-blue-800';
+      case 'SOUMIS':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'EN_REVISION':
+        return 'bg-orange-100 text-orange-800';
+      case 'VALIDE':
+        return 'bg-green-100 text-green-800';
+      case 'REJETE':
+        return 'bg-red-100 text-red-800';
+      case 'SOUTENU':
+        return 'bg-purple-100 text-purple-800';
       default:
-        return "bg-gray-100 text-gray-800";
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -204,14 +259,20 @@ const MyStudents = () => {
                   <DropdownMenuItem onClick={() => setFilterStatus('all')}>
                     Tous les statuts
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilterStatus('ACTIF')}>
-                    Actifs
+                  <DropdownMenuItem onClick={() => setFilterStatus('EN_COURS')}>
+                    En cours
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilterStatus('EN_PAUSE')}>
-                    En pause
+                  <DropdownMenuItem onClick={() => setFilterStatus('SOUMIS')}>
+                    Soumis
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilterStatus('TERMINE')}>
-                    Terminés
+                  <DropdownMenuItem onClick={() => setFilterStatus('EN_REVISION')}>
+                    En révision
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFilterStatus('VALIDE')}>
+                    Validés
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFilterStatus('SOUTENU')}>
+                    Soutenus
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -238,58 +299,69 @@ const MyStudents = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell className="font-medium">
-                      {student.prenom} {student.nom}
-                    </TableCell>
-                    <TableCell>{student.email}</TableCell>
-                    <TableCell className="max-w-xs truncate">
-                      {student.sujet}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <div className="flex-1 h-2 bg-gray-200 rounded-full">
-                          <div
-                            className={`h-2 rounded-full ${getProgressColor(student.progression)}`}
-                            style={{ width: `${student.progression}%` }}
-                          />
+                {filteredStudents.map((student) => {
+                  const locked = ['VALIDE', 'SOUTENU'].includes(student.statut);
+                  return (
+                    <TableRow key={student.id}>
+                      <TableCell className="font-medium">
+                        {student.prenom} {student.nom}
+                      </TableCell>
+                      <TableCell>{student.email}</TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {student.sujet}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <div className="flex-1 h-2 bg-gray-200 rounded-full">
+                            <div
+                              className={`h-2 rounded-full ${getProgressColor(student.progression)}`}
+                              style={{ width: `${student.progression}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-medium">{student.progression}%</span>
                         </div>
-                        <span className="text-sm font-medium">{student.progression}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusBadge(student.statut)}>
-                        {student.statut}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <Calendar className="mr-2 h-4 w-4 text-gray-400" />
-                        {new Date(student.derniereMaj).toLocaleDateString()}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleUpdateProgress(student.id, Math.min(100, student.progression + 10))}>
-                            Augmenter progression (+10%)
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleUpdateProgress(student.id, Math.max(0, student.progression - 10))}>
-                            Diminuer progression (-10%)
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusBadge(student.statut)}>
+                          {student.statut}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <Calendar className="mr-2 h-4 w-4 text-gray-400" />
+                          {new Date(student.derniereMaj).toLocaleDateString()}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              disabled={locked}
+                              className={locked ? 'opacity-50 pointer-events-none' : ''}
+                              onClick={() => !locked && handleUpdateProgress(student.memoireId, 10)}
+                            >
+                              Augmenter progression (+10%)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={locked}
+                              className={locked ? 'opacity-50 pointer-events-none' : ''}
+                              onClick={() => !locked && handleUpdateProgress(student.memoireId, -10)}
+                            >
+                              Diminuer progression (-10%)
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
 

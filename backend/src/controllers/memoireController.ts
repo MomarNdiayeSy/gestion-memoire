@@ -151,9 +151,9 @@ export const getMemoireById = async (req: Request, res: Response) => {
         },
         jury: {
           include: {
-            president: true,
-            rapporteur: true,
-            examinateur: true
+            encadreurJury1: true,
+            encadreurJury2: true,
+            encadreurJury3: true
           }
         }
       }
@@ -211,7 +211,11 @@ export const updateMemoireStatus = async (req: Request, res: Response) => {
     // Mettre à jour le statut
     const updatedMemoire = await prisma.memoire.update({
       where: { id },
-      data: { status }
+      data: {
+        status,
+        ...(status === 'VALIDE' || status === 'SOUTENU' ? { progression: 100 } : {}),
+        ...(status === 'REJETE' ? { progression: 0 } : {})
+      }
     });
 
     // Créer l'historique
@@ -244,7 +248,7 @@ export const updateMemoireStatus = async (req: Request, res: Response) => {
 export const updateMemoire = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { titre, description, motsCles, dateDepot, dateSoutenance, status } = req.body;
+    const { titre, description, motsCles, dateDepot, dateSoutenance, status, progression } = req.body;
     const userId = req.user?.userId;
     const userRole = req.user?.role;
 
@@ -257,7 +261,7 @@ export const updateMemoire = async (req: Request, res: Response) => {
     }
 
     // Vérifier les permissions : l'étudiant propriétaire peut modifier son mémoire, l'ADMIN aussi
-    if (userRole !== 'ADMIN' && userId !== memoire.etudiantId) {
+    if (userRole !== 'ADMIN' && userId !== memoire.etudiantId && userId !== memoire.encadreurId) {
       return res.status(403).json({ message: "Action non autorisée" });
     }
 
@@ -274,6 +278,7 @@ export const updateMemoire = async (req: Request, res: Response) => {
     if (dateDepot !== undefined) payload.dateDepot = dateDepot ? new Date(dateDepot) : null;
     if (dateSoutenance !== undefined) payload.dateSoutenance = dateSoutenance ? new Date(dateSoutenance) : null;
     if (status !== undefined) payload.status = status;
+    if (progression !== undefined) payload.progression = progression;
 
     const updatedMemoire = await prisma.memoire.update({
       where: { id },
