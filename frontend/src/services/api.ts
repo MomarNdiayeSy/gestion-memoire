@@ -205,9 +205,11 @@ export const userApi = {
 export const sessionApi = {
   // Créer une nouvelle session
   create: async (data: {
-    date: string;
     duree: number;
-    etudiantId: string;
+    type: 'PRESENTIEL' | 'VIRTUEL';
+    date: string;
+    meetingLink?: string;
+    salle?: string;
   }) => {
     const response = await api.post('/sessions', data);
     return response.data;
@@ -235,6 +237,12 @@ export const sessionApi = {
     remarques?: string;
   }) => {
     const response = await api.put(`/sessions/${id}`, data);
+    return response.data;
+  },
+
+  // Signer un visa (encadreur ou étudiant)
+  visa: async (id: string, type: 'ENCADREUR' | 'ETUDIANT') => {
+    const response = await api.patch(`/sessions/${id}/visa`, { type });
     return response.data;
   },
 

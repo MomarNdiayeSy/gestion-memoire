@@ -181,10 +181,11 @@ async function main() {
   // Créer les jurys
   const jury1 = await prisma.jury.create({
     data: {
+      nom: "Jury Mémoire 1",
       memoireId: memoire1.id,
-      presidentId: encadreur3.id,
-      rapporteurId: encadreur4.id,
-      examinateurId: encadreur5.id,
+      encadreurJury1Id: encadreur3.id,
+      encadreurJury2Id: encadreur4.id,
+      encadreurJury3Id: encadreur5.id,
       dateSoutenance: new Date("2024-03-15"),
       salle: "Salle A-101"
     }
@@ -192,10 +193,11 @@ async function main() {
 
   const jury2 = await prisma.jury.create({
     data: {
+      nom: "Jury Mémoire 2",
       memoireId: memoire2.id,
-      presidentId: encadreur4.id,
-      rapporteurId: encadreur5.id,
-      examinateurId: encadreur3.id,
+      encadreurJury1Id: encadreur4.id,
+      encadreurJury2Id: encadreur5.id,
+      encadreurJury3Id: encadreur3.id,
       dateSoutenance: new Date("2024-03-20"),
       salle: "Salle B-202"
     }
@@ -207,6 +209,7 @@ async function main() {
       date: new Date("2024-03-01T09:00:00Z"),
       duree: 60,
       status: "PLANIFIEE",
+      type: "PRESENTIEL",
       rapport: "Première session de suivi",
       encadreurId: encadreur1.id,
       etudiantId: etudiant1.id

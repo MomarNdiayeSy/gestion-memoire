@@ -122,16 +122,28 @@ model Sujet {
   memoires        Memoire[]
 }
 
+enum SessionType {
+  PRESENTIEL
+  VIRTUEL
+}
+
 model Session {
   id            String      @id @default(uuid())
+  numero        Int @default(1)
   date          DateTime
   duree         Int         // en minutes
   status        String      // PLANIFIE, TERMINE, ANNULE
+  type          SessionType @default(PRESENTIEL) // PRESENTIEL ou VIRTUEL
+  meetingLink   String?     // Lien de réunion pour les sessions virtuelles
+  salle         String?     // Salle pour les sessions présentielle
   rapport       String?     // Rapport de la séance
   remarques     String?     // Remarques de l'encadreur
   visaEncadreur Boolean     @default(false)
+  visaEtudiant  Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  @@unique([encadreurId, numero])
 
   // Relations
   encadreurId   String

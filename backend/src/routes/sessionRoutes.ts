@@ -4,7 +4,8 @@ import {
   getSessions,
   getSessionById,
   updateSession,
-  deleteSession
+  deleteSession,
+  visaSession
 } from '../controllers/sessionController';
 import { authMiddleware, checkRole } from '../middleware/authMiddleware';
 
@@ -24,6 +25,9 @@ router.get('/:id', getSessionById);
 
 // Mettre à jour une session (ENCADREUR uniquement)
 router.put('/:id', checkRole(['ENCADREUR']), updateSession);
+
+// Signer un visa (encadreur ou étudiant)
+router.patch('/:id/visa', authMiddleware, visaSession);
 
 // Supprimer une session (ENCADREUR uniquement)
 router.delete('/:id', checkRole(['ENCADREUR']), deleteSession);

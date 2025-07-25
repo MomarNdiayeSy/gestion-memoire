@@ -6,64 +6,90 @@ const prisma = new PrismaClient();
 // Créer une nouvelle session
 export const createSession = async (req: Request, res: Response) => {
   try {
-    const { date, duree, etudiantId } = req.body;
+    const { duree, type, meetingLink, date, salle } = req.body as {
+      duree: number;
+      type: 'PRESENTIEL' | 'VIRTUEL';
+      meetingLink?: string;
+      salle?: string;
+      date: string; // ISO string avec date et heure
+    };
     const encadreurId = req.user?.userId;
+    if (!encadreurId) return res.status(401).json({ message: 'Non autorisé' });
 
-    // Vérifier si l'étudiant existe et est encadré par cet encadreur
-    const memoire = await prisma.memoire.findFirst({
-      where: {
-        etudiantId: etudiantId,
-        encadreurId: encadreurId
-      }
+    // Récupérer les étudiants rattachés à cet encadreur (mémoires)
+    const memoires = await prisma.memoire.findMany({
+      where: { encadreurId },
+      select: { etudiantId: true }
     });
-
-    if (!memoire) {
-      return res.status(400).json({ message: "Vous n'encadrez pas cet étudiant" });
+    if (memoires.length === 0) {
+      return res.status(400).json({ message: "Aucun étudiant rattaché à cet encadreur" });
     }
 
-    const session = await prisma.session.create({
-      data: {
-        date: new Date(date),
-        duree,
-        status: "PLANIFIEE",
-        encadreurId: encadreurId!,
-        etudiantId
-      },
-      include: {
-        encadreur: {
-          select: {
-            nom: true,
-            prenom: true
-          }
-        },
-        etudiant: {
-          select: {
-            nom: true,
-            prenom: true,
-            memoireEtudiant: {
+    // Validation des champs selon le type
+    if (type === 'VIRTUEL') {
+      if (!meetingLink) return res.status(400).json({ message: 'Le lien de réunion est requis pour une session virtuelle' });
+      if (salle) return res.status(400).json({ message: 'La salle ne doit pas être renseignée pour une session virtuelle' });
+    }
+    if (type === 'PRESENTIEL') {
+      if (!salle) return res.status(400).json({ message: 'La salle est requise pour une session présentielle' });
+      if (meetingLink) return res.status(400).json({ message: 'Le lien ne doit pas être fourni pour une session présentielle' });
+    }
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ message: 'Date invalide' });
+    }
+
+    // Limite de 10 séances : on compte les sessions existantes
+    const existingCount = await prisma.session.count({ where: { encadreurId } });
+    if (existingCount >= 10) {
+      return res.status(400).json({ message: 'Limite de 10 séances atteinte' });
+    }
+
+    // Prochain numéro (par encadreur)
+    const nextNumero = existingCount + 1;
+
+    // Créer une session pour chaque étudiant
+    const createdSessions = await prisma.$transaction(
+      memoires.map((m) =>
+        prisma.session.create({
+          data: {
+            date: parsedDate,
+            duree,
+            status: 'PLANIFIE',
+            type,
+            meetingLink,
+            salle,
+            numero: nextNumero,
+            encadreurId,
+            etudiantId: m.etudiantId
+          },
+          include: {
+            encadreur: { select: { nom: true, prenom: true } },
+            etudiant: {
               select: {
-                id: true,
-                titre: true
+                nom: true,
+                prenom: true,
+                memoireEtudiant: { select: { id: true, titre: true } }
               }
             }
           }
-        }
-      }
+        })
+      )
+    );
+
+    // Notifications aux étudiants
+    await prisma.notification.createMany({
+      data: createdSessions.map((s) => ({
+        titre: 'Nouvelle session planifiée',
+        message: `Une session de mentorat a été planifiée pour le ${s.date.toLocaleDateString()}`,
+        userId: s.etudiantId
+      }))
     });
 
-    // Créer une notification pour l'étudiant
-    await prisma.notification.create({
-      data: {
-        titre: "Nouvelle session planifiée",
-        message: `Une session de mentorat a été planifiée pour le ${new Date(date).toLocaleDateString()}`,
-        userId: etudiantId
-      }
-    });
-
-    res.status(201).json(session);
+    res.status(201).json(createdSessions);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Erreur lors de la création de la session" });
+    res.status(500).json({ message: 'Erreur lors de la création de la session' });
   }
 };
 
@@ -85,7 +111,7 @@ export const getSessions = async (req: Request, res: Response) => {
       whereClause.etudiantId = userId;
     }
 
-    const sessions = await prisma.session.findMany({
+    const sessionsRaw = await prisma.session.findMany({
       where: whereClause,
       include: {
         encadreur: {
@@ -111,6 +137,12 @@ export const getSessions = async (req: Request, res: Response) => {
         date: 'desc'
       }
     });
+
+    const sessions = sessionsRaw.map((s: any) => ({
+      ...s,
+      memoireTitre: s.etudiant?.memoireEtudiant?.titre || '',
+      statut: s.status
+    }));
 
     res.json(sessions);
   } catch (error) {
@@ -158,12 +190,16 @@ export const getSessionById = async (req: Request, res: Response) => {
 
     // Vérifier les permissions
     if (userRole !== 'ADMIN' && 
-        userId !== session.etudiantId && 
-        userId !== session.encadreurId) {
+        userId !== session.encadreurId && 
+        userId !== session.etudiantId) {
       return res.status(403).json({ message: "Accès non autorisé" });
     }
 
-    res.json(session);
+    const sessionData = {
+      ...session,
+      memoireTitre: session.etudiant?.memoireEtudiant?.titre || ''
+    } as any;
+    res.json(sessionData);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Erreur lors de la récupération de la session" });
@@ -171,6 +207,43 @@ export const getSessionById = async (req: Request, res: Response) => {
 };
 
 // Mettre à jour une session
+// Visa d'une session
+export const visaSession = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { type } = req.body as { type: 'ENCADREUR' | 'ETUDIANT' };
+    const userId = req.user?.userId;
+
+    const session = await prisma.session.findUnique({ where: { id } });
+    if (!session) return res.status(404).json({ message: 'Session non trouvée' });
+
+    // Vérification de l'auteur du visa
+    if (type === 'ENCADREUR' && userId !== session.encadreurId) {
+      return res.status(403).json({ message: "Seul l'encadreur peut signer ce visa" });
+    }
+    if (type === 'ETUDIANT' && userId !== session.etudiantId) {
+      return res.status(403).json({ message: "Seul l'étudiant concerné peut signer ce visa" });
+    }
+
+    const updated = await prisma.session.update({
+      where: { id },
+      data: {
+        visaEncadreur: type === 'ENCADREUR' ? true : session.visaEncadreur,
+        visaEtudiant: type === 'ETUDIANT' ? true : session.visaEtudiant,
+        // Terminer automatiquement si les deux visas sont vrais
+        status: (type === 'ENCADREUR' ? true : session.visaEncadreur) && (type === 'ETUDIANT' ? true : session.visaEtudiant)
+          ? 'TERMINE'
+          : session.status
+      }
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur lors de la signature du visa' });
+  }
+};
+
 export const updateSession = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;

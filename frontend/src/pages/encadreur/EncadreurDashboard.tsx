@@ -1,60 +1,105 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { sujetApi, memoireApi, sessionApi } from '@/services/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, Users, Calendar, FileText, Plus, Clock } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import DashboardLayout from '../../components/layout/DashboardLayout';
 
 const EncadreurDashboard = () => {
+  /* --- Queries --- */
+  const sujetsQuery = useQuery({ queryKey: ['sujets'], queryFn: () => sujetApi.getAll() });
+  const memoiresQuery = useQuery({ queryKey: ['memoires'], queryFn: () => memoireApi.getAll?.({}) ?? Promise.resolve([]) });
+  const sessionsQuery = useQuery({ queryKey: ['sessions'], queryFn: () => sessionApi.getAll() });
+
+  const sujets = sujetsQuery.data || [];
+  const memoires = memoiresQuery.data || [];
+  const sessions = sessionsQuery.data || [];
+
+  const upcomingSessionsAll = sessions.filter((s: any) => ['PLANIFIE', 'PLANIFIEE'].includes(s.status));
+
+  /* --- Derived data --- */
+  const studentsSet = new Set<string>();
+  memoires.forEach((m: any) => {
+    if (m.etudiant) studentsSet.add(`${m.etudiant.prenom} ${m.etudiant.nom}`);
+  });
+
   const stats = [
     {
-      title: "Mes Sujets",
-      value: "8",
-      description: "sujets proposés",
+      title: 'Mes Sujets',
+      value: sujets.length.toString(),
+      description: 'sujets proposés',
       icon: BookOpen,
-      color: "from-blue-600 to-blue-700"
+      color: 'from-blue-600 to-blue-700',
     },
     {
-      title: "Étudiants",
-      value: "12",
-      description: "en encadrement",
+      title: 'Étudiants',
+      value: studentsSet.size.toString(),
+      description: 'en encadrement',
       icon: Users,
-      color: "from-green-600 to-green-700"
+      color: 'from-green-600 to-green-700',
     },
     {
-      title: "Séances",
-      value: "45",
-      description: "cette semaine",
+      title: 'Séances',
+      value: upcomingSessionsAll.length.toString(),
+      description: 'à venir',
       icon: Calendar,
-      color: "from-purple-600 to-purple-700"
+      color: 'from-purple-600 to-purple-700',
     },
     {
-      title: "Mémoires",
-      value: "6",
-      description: "à évaluer",
+      title: 'Mémoires',
+      value: memoires.length.toString(),
+      description: 'attribués',
       icon: FileText,
-      color: "from-orange-600 to-orange-700"
-    }
+      color: 'from-orange-600 to-orange-700',
+    },
   ];
 
-  const myStudents = [
-    { name: "Amine Trabelsi", subject: "IA et Machine Learning", progress: 75, status: "En cours" },
-    { name: "Fatma Zahra", subject: "Développement Mobile", progress: 90, status: "Soutenance" },
-    { name: "Mohamed Salah", subject: "Cybersécurité", progress: 45, status: "En cours" },
-    { name: "Leila Ben Ali", subject: "Big Data Analytics", progress: 60, status: "En cours" },
-  ];
+  // Utilitaire pour la progression par défaut
+  function getDefaultProgression(status: string): number {
+    const progressMap: Record<string, number> = {
+      EN_COURS: 25,
+      SOUMIS: 50,
+      EN_REVISION: 75,
+      VALIDE: 100,
+      SOUTENU: 100,
+      REJETE: 0,
+    };
+    return progressMap[status] ?? 25;
+  }
 
-  const upcomingSessions = [
-    { student: "Amine Trabelsi", date: "Aujourd'hui", time: "14:00", type: "Suivi" },
-    { student: "Fatma Zahra", date: "Demain", time: "10:30", type: "Validation" },
-    { student: "Mohamed Salah", date: "Vendredi", time: "16:00", type: "Révision" },
-  ];
+  /* My Students list */
+  const myStudents = memoires.map((m: any) => ({
+    name: `${m.etudiant?.prenom || ''} ${m.etudiant?.nom || ''}`.trim(),
+    subject: m.titre || m.sujet?.titre || '',
+    progress: (m.progression === 0 && ['VALIDE','SOUTENU'].includes(m.status)) ? 100 : (m.progression ?? getDefaultProgression(m.status)),
+    status: m.status || 'En cours',
+  }));
 
-  const recentSubjects = [
-    { title: "Intelligence Artificielle et IoT", status: "Validé", students: 3 },
-    { title: "Blockchain et Cryptomonnaies", status: "En attente", students: 0 },
-    { title: "Réalité Virtuelle et Gaming", status: "Validé", students: 2 },
-  ];
+  /* Upcoming sessions list */
+  const upcomingSessions = upcomingSessionsAll
+    .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(0, 5)
+    .map((s: any) => ({
+      numero: s.numero,
+      student: (s.etudiants || []).join(', '),
+      date: new Date(s.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }),
+      time: new Date(s.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      type: s.type,
+       salle: s.salle,
+    }));
+
+  /* Recent subjects */
+  const recentSubjects = sujets.slice(0, 6).map((s: any) => ({
+    title: s.titre,
+    status: s.status === 'VALIDE' ? 'Validé' : 'En attente',
+    students: s.memoires?.length || 0,
+  }));
+
+
+
 
   return (
     <DashboardLayout allowedRoles={['ENCADREUR']}>
@@ -65,10 +110,6 @@ const EncadreurDashboard = () => {
             <h1 className="text-3xl font-bold text-gray-900">Mon Espace Encadreur</h1>
             <p className="text-gray-600 mt-1">Gérez vos étudiants et sujets de mémoire</p>
           </div>
-          <Button className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700">
-            <Plus className="mr-2 h-4 w-4" />
-            Nouveau Sujet
-          </Button>
         </div>
 
         {/* Stats Cards */}
@@ -150,17 +191,22 @@ const EncadreurDashboard = () => {
                 {upcomingSessions.map((session, index) => (
                   <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                     <div>
-                      <h4 className="font-medium text-gray-900">{session.student}</h4>
+                      <h4 className="font-medium text-gray-900">Séance {session.numero}</h4>
                       <p className="text-sm text-gray-600">{session.date} à {session.time}</p>
+                      {session.type === 'PRESENTIEL' && (
+                        <p className="text-xs text-gray-500">Salle: {session.salle || 'Non renseignée'}</p>
+                      )}
                     </div>
                     <div className="text-right">
                       <Badge className="bg-green-100 text-green-800 text-xs mb-2">
                         {session.type}
                       </Badge>
                       <br />
-                      <Button size="sm" variant="outline">
-                        Détails
-                      </Button>
+                      <Link to={`/encadreur/sessions?numero=${session.numero}`}>
+                        <Button size="sm" variant="outline">
+                          Détails
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 ))}

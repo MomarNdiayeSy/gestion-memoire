@@ -13,6 +13,15 @@ CREATE TYPE "SessionStatus" AS ENUM ('PLANIFIEE', 'EFFECTUEE', 'ANNULEE');
 -- CreateEnum
 CREATE TYPE "PaiementStatus" AS ENUM ('EN_ATTENTE', 'VALIDE', 'REJETE');
 
+-- CreateEnum
+CREATE TYPE "JuryStatus" AS ENUM ('PLANIFIE', 'TERMINE', 'ANNULE');
+
+-- CreateEnum
+CREATE TYPE "SessionType" AS ENUM ('PRESENTIEL', 'VIRTUEL');
+
+-- CreateEnum
+CREATE TYPE "PaymentMethod" AS ENUM ('ESPECE', 'ORANGE_MONEY', 'WAVE', 'YAS');
+
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
@@ -20,7 +29,7 @@ CREATE TABLE "User" (
     "password" TEXT NOT NULL,
     "nom" TEXT NOT NULL,
     "prenom" TEXT NOT NULL,
-    "role" "UserRole" NOT NULL,
+    "role" TEXT NOT NULL,
     "specialite" TEXT,
     "matricule" TEXT,
     "telephone" TEXT,
@@ -35,7 +44,7 @@ CREATE TABLE "Memoire" (
     "id" TEXT NOT NULL,
     "titre" TEXT NOT NULL,
     "description" TEXT NOT NULL,
-    "status" "MemoireStatus" NOT NULL,
+    "status" TEXT NOT NULL,
     "fichierUrl" TEXT,
     "motsCles" TEXT[],
     "dateDepot" TIMESTAMP(3),
@@ -44,6 +53,7 @@ CREATE TABLE "Memoire" (
     "mention" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "progression" INTEGER NOT NULL DEFAULT 0,
     "etudiantId" TEXT NOT NULL,
     "encadreurId" TEXT NOT NULL,
     "sujetId" TEXT NOT NULL,
@@ -56,7 +66,7 @@ CREATE TABLE "Sujet" (
     "id" TEXT NOT NULL,
     "titre" TEXT NOT NULL,
     "description" TEXT NOT NULL,
-    "status" "SujetStatus" NOT NULL DEFAULT 'EN_ATTENTE',
+    "status" TEXT NOT NULL,
     "motsCles" TEXT[],
     "dateValidation" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -71,7 +81,8 @@ CREATE TABLE "Session" (
     "id" TEXT NOT NULL,
     "date" TIMESTAMP(3) NOT NULL,
     "duree" INTEGER NOT NULL,
-    "status" "SessionStatus" NOT NULL,
+    "status" TEXT NOT NULL,
+    "type" "SessionType" NOT NULL DEFAULT 'PRESENTIEL',
     "rapport" TEXT,
     "remarques" TEXT,
     "visaEncadreur" BOOLEAN NOT NULL DEFAULT false,
@@ -100,14 +111,16 @@ CREATE TABLE "Document" (
 -- CreateTable
 CREATE TABLE "Jury" (
     "id" TEXT NOT NULL,
+    "nom" TEXT NOT NULL,
     "dateSoutenance" TIMESTAMP(3) NOT NULL,
     "salle" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "statut" "JuryStatus" NOT NULL DEFAULT 'PLANIFIE',
     "memoireId" TEXT NOT NULL,
-    "presidentId" TEXT NOT NULL,
-    "rapporteurId" TEXT NOT NULL,
-    "examinateurId" TEXT NOT NULL,
+    "encadreurJury1Id" TEXT NOT NULL,
+    "encadreurJury2Id" TEXT NOT NULL,
+    "encadreurJury3Id" TEXT NOT NULL,
 
     CONSTRAINT "Jury_pkey" PRIMARY KEY ("id")
 );
@@ -116,12 +129,13 @@ CREATE TABLE "Jury" (
 CREATE TABLE "Paiement" (
     "id" TEXT NOT NULL,
     "montant" DOUBLE PRECISION NOT NULL,
-    "status" "PaiementStatus" NOT NULL,
     "reference" TEXT NOT NULL,
     "date" TIMESTAMP(3) NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'EN_ATTENTE',
+    "methode" "PaymentMethod" NOT NULL DEFAULT 'ESPECE',
+    "etudiantId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "etudiantId" TEXT NOT NULL,
 
     CONSTRAINT "Paiement_pkey" PRIMARY KEY ("id")
 );
@@ -131,10 +145,10 @@ CREATE TABLE "Notification" (
     "id" TEXT NOT NULL,
     "titre" TEXT NOT NULL,
     "message" TEXT NOT NULL,
-    "lue" BOOLEAN NOT NULL DEFAULT false,
+    "lu" BOOLEAN NOT NULL DEFAULT false,
+    "userId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "userId" TEXT NOT NULL,
 
     CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
 );
@@ -142,7 +156,7 @@ CREATE TABLE "Notification" (
 -- CreateTable
 CREATE TABLE "HistoriqueMemoireStatus" (
     "id" TEXT NOT NULL,
-    "status" "MemoireStatus" NOT NULL,
+    "status" TEXT NOT NULL,
     "commentaire" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "memoireId" TEXT NOT NULL,
@@ -184,13 +198,13 @@ ALTER TABLE "Document" ADD CONSTRAINT "Document_memoireId_fkey" FOREIGN KEY ("me
 ALTER TABLE "Jury" ADD CONSTRAINT "Jury_memoireId_fkey" FOREIGN KEY ("memoireId") REFERENCES "Memoire"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Jury" ADD CONSTRAINT "Jury_presidentId_fkey" FOREIGN KEY ("presidentId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Jury" ADD CONSTRAINT "Jury_encadreurJury1Id_fkey" FOREIGN KEY ("encadreurJury1Id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Jury" ADD CONSTRAINT "Jury_rapporteurId_fkey" FOREIGN KEY ("rapporteurId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Jury" ADD CONSTRAINT "Jury_encadreurJury2Id_fkey" FOREIGN KEY ("encadreurJury2Id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Jury" ADD CONSTRAINT "Jury_examinateurId_fkey" FOREIGN KEY ("examinateurId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Jury" ADD CONSTRAINT "Jury_encadreurJury3Id_fkey" FOREIGN KEY ("encadreurJury3Id") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Paiement" ADD CONSTRAINT "Paiement_etudiantId_fkey" FOREIGN KEY ("etudiantId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
