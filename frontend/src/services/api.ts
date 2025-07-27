@@ -139,6 +139,19 @@ export const memoireApi = {
     return response.data;
   },
 
+  // Obtenir le mémoire de l'étudiant connecté
+  getMy: async () => {
+    try {
+      const response = await api.get('/memoires/me');
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null; // Aucun mémoire pour l'étudiant
+      }
+      throw error;
+    }
+  },
+
   // Mettre à jour un mémoire
   update: async (id: string, data: {
     titre?: string;
@@ -202,6 +215,20 @@ export const userApi = {
   }
 };
 
+export const subjectApi = {
+  // Obtenir tous les sujets (optionnellement filtrés)
+  getAll: async (filters?: { status?: string }) => {
+    const params = new URLSearchParams(filters);
+    const response = await api.get(`/sujets?${params}`);
+    return response.data;
+  },
+  // Réserver / choisir un sujet pour l'étudiant connecté
+  reserve: async (id: string) => {
+    const response = await api.post(`/sujets/${id}/reserve`);
+    return response.data;
+  }
+};
+
 export const sessionApi = {
   // Créer une nouvelle session
   create: async (data: {
@@ -240,6 +267,25 @@ export const sessionApi = {
     return response.data;
   },
 
+  // ---------------------- Session Requests ----------------------
+  // Récupérer les demandes de session (étudiant ou encadreur selon rôle auth)
+  getRequests: async () => {
+    const response = await api.get('/session-requests');
+    return response.data;
+  },
+
+  // Encadreur met à jour une demande (accepte/refuse)
+  updateRequest: async (id: string, data: { statut: 'ACCEPTEE' | 'REFUSEE'; meetingLink?: string; duree?: number }) => {
+    const response = await api.patch(`/session-requests/${id}`, data);
+    return response.data;
+  },
+
+  // Demander une session (étudiant)
+  request: async (data: { date: string; heure: string; type: 'PRESENTIEL' | 'VIRTUEL' }) => {
+    const response = await api.post('/session-requests', data);
+    return response.data;
+  },
+
   // Signer un visa (encadreur ou étudiant)
   visa: async (id: string, type: 'ENCADREUR' | 'ETUDIANT') => {
     const response = await api.patch(`/sessions/${id}/visa`, { type });
@@ -251,6 +297,21 @@ export const sessionApi = {
     const response = await api.delete(`/sessions/${id}`);
     return response.data;
   }
+};
+
+export const paymentApi = {
+  // Créer un paiement (étudiant connecté ou admin pour un étudiant)
+  create: async (data: { montant: number; date: string; methode: 'ESPECE' | 'ORANGE_MONEY' | 'WAVE' | 'YAS'; reference?: string }) => {
+    const response = await api.post('/paiements', data);
+    return response.data;
+  },
+
+  // Lister les paiements (filtre status optionnel)
+  getAll: async (filters?: { status?: 'EN_ATTENTE' | 'VALIDE' | 'REJETE' }) => {
+    const params = new URLSearchParams(filters);
+    const response = await api.get(`/paiements?${params}`);
+    return response.data;
+  },
 };
 
 export const juryApi = {

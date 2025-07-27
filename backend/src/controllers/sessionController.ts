@@ -101,6 +101,11 @@ export const getSessions = async (req: Request, res: Response) => {
     const { status } = req.query;
 
     let whereClause: any = {};
+
+    // Restreindre l'accès : seuls l'étudiant concerné ou son encadreur peuvent voir
+    if (userRole !== 'ENCADREUR' && userRole !== 'ETUDIANT') {
+      return res.status(403).json({ message: 'Accès interdit' });
+    }
     if (status) {
       whereClause.status = status;
     }

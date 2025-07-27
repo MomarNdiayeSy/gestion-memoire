@@ -77,6 +77,8 @@ model User {
   jurysEncadreur1     Jury[]     @relation("JuryEncadreur1")
   jurysEncadreur2     Jury[]     @relation("JuryEncadreur2")
   jurysEncadreur3     Jury[]     @relation("JuryEncadreur3")
+  sessionRequestsEtudiant  SessionRequest[] @relation("SessionRequestEtudiant")
+  sessionRequestsEncadreur SessionRequest[] @relation("SessionRequestEncadreur")
 }
 
 model Memoire {
@@ -150,6 +152,24 @@ model Session {
   encadreur     User        @relation("EncadreurSessions", fields: [encadreurId], references: [id])
   etudiantId    String
   etudiant      User        @relation("EtudiantSessions", fields: [etudiantId], references: [id])
+}
+
+model SessionRequest {
+  id          String      @id @default(uuid())
+  date        DateTime
+  heure       String      // "HH:mm"
+  type        SessionType
+  statut      String      @default("EN_ATTENTE") // EN_ATTENTE, ACCEPTEE, REFUSEE
+
+  etudiantId  String
+  encadreurId String
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  etudiant    User @relation("SessionRequestEtudiant", fields: [etudiantId], references: [id])
+  encadreur   User @relation("SessionRequestEncadreur", fields: [encadreurId], references: [id])
 }
 
 model Document {

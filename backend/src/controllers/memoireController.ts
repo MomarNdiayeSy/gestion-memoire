@@ -3,6 +3,31 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Obtenir le mémoire de l'étudiant connecté
+export const getMyMemoire = async (req: Request, res: Response) => {
+  try {
+    const etudiantId = req.user?.userId;
+    const memoire = await prisma.memoire.findUnique({
+      where: { etudiantId: etudiantId },
+      include: {
+        sujet: true,
+        encadreur: {
+          select: { nom: true, prenom: true }
+        }
+      }
+    });
+
+    if (!memoire) {
+      return res.status(404).json({ message: 'Mémoire non trouvé' });
+    }
+
+    res.json(memoire);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur lors de la récupération du mémoire' });
+  }
+};
+
 // Créer un nouveau mémoire
 export const createMemoire = async (req: Request, res: Response) => {
   try {

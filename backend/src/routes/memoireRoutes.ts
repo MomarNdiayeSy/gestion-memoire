@@ -3,6 +3,7 @@ import {
   createMemoire,
   getMemoires,
   getMemoireById,
+  getMyMemoire,
   updateMemoireStatus,
   updateMemoire,
   addDocument
@@ -16,6 +17,9 @@ router.use(authMiddleware);
 
 // Créer un mémoire (ETUDIANT uniquement)
 router.post('/', checkRole(['ETUDIANT']), createMemoire);
+
+// Obtenir le mémoire de l'étudiant connecté
+router.get('/me', checkRole(['ETUDIANT']), getMyMemoire);
 
 // Obtenir tous les mémoires (ADMIN, ENCADREUR, ETUDIANT)
 router.get('/', checkRole(['ADMIN', 'ENCADREUR', 'ETUDIANT']), getMemoires);

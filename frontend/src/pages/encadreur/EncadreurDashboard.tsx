@@ -26,11 +26,13 @@ const EncadreurDashboard = () => {
     if (m.etudiant) studentsSet.add(`${m.etudiant.prenom} ${m.etudiant.nom}`);
   });
 
+  const sujetsDisponibles = sujets.filter((s: any) => s.status === 'VALIDE');
+
   const stats = [
     {
-      title: 'Mes Sujets',
-      value: sujets.length.toString(),
-      description: 'sujets proposés',
+      title: 'Sujets Disponibles',
+      value: sujetsDisponibles.length.toString(),
+      description: 'validés',
       icon: BookOpen,
       color: 'from-blue-600 to-blue-700',
     },

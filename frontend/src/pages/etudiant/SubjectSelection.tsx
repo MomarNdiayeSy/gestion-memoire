@@ -16,8 +16,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -29,11 +27,14 @@ import {
   Users
 } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { subjectApi, memoireApi } from "@/services/api";
 
 interface Sujet {
   id: string;
   titre: string;
   description: string;
+  motsCles?: string[];
   encadreur: {
     nom: string;
     prenom: string;
@@ -47,72 +48,58 @@ interface Sujet {
 const SubjectSelection = () => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState('');
-  const [filterDifficulty, setFilterDifficulty] = React.useState('all');
+  const [filterEncadreur, setFilterEncadreur] = React.useState('all');
   const [selectedSujet, setSelectedSujet] = React.useState<Sujet | null>(null);
 
-  // Données fictives pour les sujets
-  const [sujets] = React.useState<Sujet[]>([
-    {
-      id: '1',
-      titre: 'Développement d\'une application de gestion de mémoires',
-      description: 'Application web permettant la gestion des mémoires de fin d\'études, incluant le suivi des étudiants, la gestion des soutenances et les paiements. Le projet utilisera des technologies modernes et devra être responsive.',
-      encadreur: {
-        nom: 'Diop',
-        prenom: 'Abdoulaye',
-        specialite: 'Développement Web'
-      },
-      technologies: ['React', 'Node.js', 'TypeScript', 'PostgreSQL'],
-      difficulte: 'MOYEN',
-      dureeEstimee: '4-5 mois'
-    },
-    {
-      id: '2',
-      titre: 'Système de reconnaissance faciale pour la sécurité',
-      description: 'Implémentation d\'un système de reconnaissance faciale utilisant l\'apprentissage profond pour la sécurité des bâtiments. Le projet inclura la détection en temps réel et la gestion des accès.',
-      encadreur: {
-        nom: 'Sow',
-        prenom: 'Mariama',
-        specialite: 'Intelligence Artificielle'
-      },
-      technologies: ['Python', 'TensorFlow', 'OpenCV'],
-      difficulte: 'DIFFICILE',
-      dureeEstimee: '5-6 mois'
-    },
-    {
-      id: '3',
-      titre: 'Plateforme e-learning intelligente',
-      description: 'Développement d\'une plateforme e-learning avec des recommandations personnalisées basées sur l\'IA. Le système adaptera le contenu en fonction du niveau et des préférences de l\'apprenant.',
-      encadreur: {
-        nom: 'Fall',
-        prenom: 'Ibrahim',
-        specialite: 'E-learning'
-      },
-      technologies: ['Vue.js', 'Django', 'Machine Learning'],
-      difficulte: 'FACILE',
-      dureeEstimee: '3-4 mois'
-    }
-  ]);
+  // Récupération des sujets disponibles depuis le backend
+  const queryClient = useQueryClient();
+  const { data: sujets = [], isLoading } = useQuery({
+    queryKey: ['sujets'],
+    queryFn: () => subjectApi.getAll({ status: 'VALIDE' })
+  });
+
+  // Mémoire déjà choisi par l'étudiant (s'il existe)
+  const { data: memoire } = useQuery({
+    queryKey: ['memoire'],
+    queryFn: () => memoireApi.getMy(),
+    staleTime: 1000 * 60 // 1 min
+  });
+
+  const hasChosen = !!memoire && (!!memoire.id || !!(memoire as any)?.sujetId || !!(memoire as any)?.sujet?.id) || !!selectedSujet;
 
   const handleSelectSujet = (sujet: Sujet) => {
     setSelectedSujet(sujet);
   };
 
+  const createMemoireMutation = useMutation({
+    mutationFn: (sujet: Sujet) => memoireApi.create({
+      titre: sujet.titre,
+      description: sujet.description,
+      motsCles: sujet.motsCles ?? [],
+      sujetId: sujet.id,
+    }),
+    onSuccess: () => {
+      toast({ title: 'Sujet sélectionné', description: 'Votre mémoire a été créé avec succès' });
+      queryClient.invalidateQueries({ queryKey: ['memoire'] });
+      queryClient.invalidateQueries({ queryKey: ['sujets'] });
+    },
+    onError: () => {
+      toast({ title: 'Erreur', description: 'Impossible de créer votre mémoire', variant: 'destructive' });
+    },
+  });
+
   const handleConfirmSelection = () => {
     if (!selectedSujet) return;
-    
-    toast({
-      title: "Sujet sélectionné",
-      description: "Votre choix a été enregistré avec succès",
-    });
+    createMemoireMutation.mutate(selectedSujet);
   };
 
-  const filteredSujets = sujets.filter(sujet => {
-    const matchesSearch = 
+  const filteredSujets = (sujets as any[]).filter(sujet => {
+    const matchesSearch =
       sujet.titre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       sujet.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sujet.technologies.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesDifficulty = filterDifficulty === 'all' || sujet.difficulte === filterDifficulty;
-    return matchesSearch && matchesDifficulty;
+      (sujet.technologies ?? sujet.motsCles ?? []).some((t: string) => t.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesEncadreur = filterEncadreur === 'all' || sujet.encadreur.nom === filterEncadreur;
+    return matchesSearch && matchesEncadreur;
   });
 
   const getDifficultyBadge = (difficulty: string) => {
@@ -175,7 +162,7 @@ const SubjectSelection = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Technologies Uniques</p>
                   <p className="text-2xl font-bold text-green-600 mt-2">
-                    {new Set(sujets.flatMap(s => s.technologies)).size}
+                    {new Set(sujets.flatMap((s: any) => s.technologies ?? s.motsCles ?? [])).size}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -203,22 +190,18 @@ const SubjectSelection = () => {
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="w-full md:w-auto">
                     <Filter className="mr-2 h-4 w-4" />
-                    Filtrer par difficulté
+                    Filtrer par encadreur
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={() => setFilterDifficulty('all')}>
-                    Toutes les difficultés
+                  <DropdownMenuItem onClick={() => setFilterEncadreur('all')}>
+                    Tous les encadreurs
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilterDifficulty('FACILE')}>
-                    Facile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilterDifficulty('MOYEN')}>
-                    Moyen
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilterDifficulty('DIFFICILE')}>
-                    Difficile
-                  </DropdownMenuItem>
+                  {Array.from(new Set((sujets as any[]).map(s => s.encadreur.nom))).map((name) => (
+                    <DropdownMenuItem key={name} onClick={() => setFilterEncadreur(name)}>
+                      {name}
+                    </DropdownMenuItem>
+                  ))}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -227,95 +210,102 @@ const SubjectSelection = () => {
 
         {/* Sujets Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredSujets.map((sujet) => (
-            <Card 
-              key={sujet.id} 
-              className={`border-0 shadow-lg transition-all duration-200 ${
-                selectedSujet?.id === sujet.id ? 'ring-2 ring-blue-500' : ''
-              }`}
-            >
-              <CardHeader>
-                <CardTitle className="text-lg">{sujet.titre}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Badge className={getDifficultyBadge(sujet.difficulte)}>
-                      {sujet.difficulte}
-                    </Badge>
-                    <Badge variant="outline">
-                      {sujet.dureeEstimee}
-                    </Badge>
-                  </div>
+          {filteredSujets.map((sujet) => {
+            const chosenSujetId = (memoire as any)?.sujetId ?? (memoire as any)?.sujet?.id;
+            const isChosen = chosenSujetId === sujet.id || (!memoire && selectedSujet?.id === sujet.id);
+            const isSelected = isChosen || selectedSujet?.id === sujet.id;
+            const disabled = hasChosen && !isSelected;
+            return (
+              <Card
+                key={sujet.id}
+                className={`border-0 shadow-lg transition-all duration-200 ${isChosen ? 'ring-2 ring-green-500' : ''}`}
+              >
+                <CardHeader>
+                  <CardTitle className="text-lg">{sujet.titre}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <p className="text-gray-600 text-sm">
+                      {sujet.description}
+                    </p>
 
-                  <p className="text-gray-600 text-sm">
-                    {sujet.description}
-                  </p>
+                    <div className="flex flex-wrap gap-2">
+                      {((sujet.technologies ?? sujet.motsCles ?? [])).map((tech, index) => (
+                        <Badge key={index} variant="outline">
+                          {tech}
+                        </Badge>
+                      ))}
+                    </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {sujet.technologies.map((tech, index) => (
-                      <Badge key={index} variant="outline">
-                        {tech}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  <div className="border-t pt-4 mt-4">
-                    <div className="flex items-center space-x-2">
-                      <User className="h-4 w-4 text-gray-400" />
-                      <div className="text-sm">
-                        <span className="font-medium">Encadreur: </span>
-                        {sujet.encadreur.prenom} {sujet.encadreur.nom}
+                    <div className="border-t pt-4 mt-4">
+                      <div className="flex items-center space-x-2">
+                        <User className="h-4 w-4 text-gray-400" />
+                        <div className="text-sm">
+                          <span className="font-medium">Encadreur: </span>
+                          {sujet.encadreur.prenom} {sujet.encadreur.nom}
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        Spécialité: {sujet.encadreur.specialite}
                       </div>
                     </div>
-                    <div className="text-sm text-gray-500 mt-1">
-                      Spécialité: {sujet.encadreur.specialite}
-                    </div>
-                  </div>
 
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button 
-                        className="w-full mt-4"
-                        variant={selectedSujet?.id === sujet.id ? "outline" : "default"}
-                        onClick={() => handleSelectSujet(sujet)}
-                      >
-                        {selectedSujet?.id === sujet.id ? 'Sujet Sélectionné' : 'Choisir ce Sujet'}
+                    {memoire?.sujetId === sujet.id ? (
+                      <Button className="w-full mt-4" variant="outline" disabled>
+                        Sujet sélectionné
                       </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Confirmer la sélection</DialogTitle>
-                        <DialogDescription>
-                          Êtes-vous sûr de vouloir choisir ce sujet ? Ce choix est définitif.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <h4 className="font-medium">Sujet sélectionné:</h4>
-                          <p className="text-sm text-gray-600">{sujet.titre}</p>
-                        </div>
-                        <div>
-                          <h4 className="font-medium">Encadreur:</h4>
-                          <p className="text-sm text-gray-600">
-                            {sujet.encadreur.prenom} {sujet.encadreur.nom}
-                          </p>
-                        </div>
-                        <div className="flex justify-end space-x-2">
-                          <Button variant="outline" onClick={() => setSelectedSujet(null)}>
-                            Annuler
+                    ) : hasChosen ? (
+                      <Button className="w-full mt-4" variant="secondary" disabled>
+                        Vous avez déjà choisi un sujet
+                      </Button>
+                    ) : (
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            className="w-full mt-4"
+                            variant={isChosen ? 'outline' : 'default'}
+                            onClick={() => handleSelectSujet(sujet)}
+                          >
+                            {
+                                isChosen ? 'Sujet sélectionné' :
+                                disabled ? (memoire ? 'Vous avez déjà choisi un sujet' : 'Vous avez déjà choisi un sujet') :
+                                'Choisir ce Sujet'
+                              }
                           </Button>
-                          <Button onClick={handleConfirmSelection}>
-                            Confirmer
-                          </Button>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Confirmer la sélection</DialogTitle>
+                            <DialogDescription>
+                              Êtes-vous sûr de vouloir choisir ce sujet ? Ce choix est définitif.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div>
+                              <h4 className="font-medium">Sujet sélectionné:</h4>
+                              <p className="text-sm text-gray-600">{sujet.titre}</p>
+                            </div>
+                            <div>
+                              <h4 className="font-medium">Encadreur:</h4>
+                              <p className="text-sm text-gray-600">
+                                {sujet.encadreur.prenom} {sujet.encadreur.nom}
+                              </p>
+                            </div>
+                            <div className="flex justify-end space-x-2">
+                              <Button variant="outline" onClick={() => setSelectedSujet(null)}>
+                                Annuler
+                              </Button>
+                              <Button onClick={handleConfirmSelection}>Confirmer</Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
 
           {filteredSujets.length === 0 && (
             <div className="col-span-full text-center py-8 text-gray-500">

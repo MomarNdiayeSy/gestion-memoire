@@ -24,7 +24,7 @@ interface Sujet {
   titre: string;
   description: string;
   motsCles: string[];
-  status: 'DISPONIBLE' | 'RESERVE' | 'EN_COURS' | 'TERMINE';
+  status: 'DISPONIBLE' | 'RESERVE' | 'EN_COURS' | 'TERMINE' | 'VALIDE';
   memoires: any[];
   etudiant?: string;
   createdAt: string;
@@ -248,7 +248,7 @@ const MySubjects = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Sujets Disponibles</p>
                   <p className="text-2xl font-bold text-green-600 mt-2">
-                    {sujets.filter(s => s.status === 'DISPONIBLE').length}
+                    {sujets.filter(s => s.status === 'VALIDE' && (s.memoires?.length ?? 0) === 0).length}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">

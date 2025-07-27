@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar, Clock, Plus, CheckCircle, Eye, Users, XCircle, Filter, Search } from 'lucide-react';
+import { Calendar, Clock, Plus, CheckCircle, Eye, Users, XCircle, Filter, Search, MessageSquare, Link } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+import { SessionRequest } from '@/lib/session';
 
 interface Session {
   id: string;
@@ -57,9 +59,16 @@ const Sessions = () => {
     salle: ''
   });
 
+  // sessions
   const { data: sessions = [], isLoading: loading } = useQuery<Session[]>({
     queryKey: ['sessions'],
     queryFn: () => sessionApi.getAll()
+  });
+
+  // demandes de session
+  const { data: sessionRequests = [] } = useQuery<SessionRequest[]>({
+    queryKey: ['sessionRequests'],
+    queryFn: () => sessionApi.getRequests(),
   });
 
   const updateStatusMutation = useMutation({
@@ -104,6 +113,34 @@ const Sessions = () => {
       toast({ title: 'Erreur', description: 'Erreur lors de la signature du visa', variant: 'destructive' });
     }
   });
+
+  const updateRequestMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { statut: 'ACCEPTEE' | 'REFUSEE'; meetingLink?: string; duree?: number; salle?: string } }) => sessionApi.updateRequest(id, data),
+    onSuccess: () => {
+      toast({ title: 'Succès', description: 'Demande mise à jour' });
+      queryClient.invalidateQueries({ queryKey: ['sessionRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    },
+    onError: () => toast({ title: 'Erreur', description: 'Action impossible', variant: 'destructive' }),
+  });
+
+  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+  const [acceptForm, setAcceptForm] = useState<{ meetingLink: string; salle: string; duree: number }>({ meetingLink: '', salle: '', duree: 60 });
+  const [requestToAccept, setRequestToAccept] = useState<SessionRequest | null>(null);
+
+  const handleRequestAction = (req: SessionRequest, statut: 'ACCEPTEE' | 'REFUSEE') => {
+    if (statut === 'REFUSEE') {
+      updateRequestMutation.mutate({ id: req.id, data: { statut } });
+      return;
+    }
+
+    if (req.type === 'VIRTUEL' || req.type === 'PRESENTIEL') {
+      setRequestToAccept(req);
+      setAcceptDialogOpen(true);
+    } else {
+      updateRequestMutation.mutate({ id: req.id, data: { statut } });
+    }
+  };
 
   const deleteSessionMutation = useMutation({
     mutationFn: (id: string) => sessionApi.delete(id),
@@ -196,9 +233,44 @@ const Sessions = () => {
     return type === 'VIRTUEL' ? 'bg-purple-100 text-purple-800' : 'bg-orange-100 text-orange-800';
   };
 
+  const submitAccept = () => {
+    const data: any = { statut: 'ACCEPTEE', duree: acceptForm.duree };
+    if (requestToAccept.type === 'VIRTUEL') data.meetingLink = acceptForm.meetingLink;
+    if (requestToAccept.type === 'PRESENTIEL') data.salle = acceptForm.salle;
+    updateRequestMutation.mutate({ id: requestToAccept.id, data });
+  };
+
   return (
     <DashboardLayout allowedRoles={['ENCADREUR']}>
       <div className="space-y-6">
+        {/* Page Header */}
+        {sessionRequests.length > 0 && (
+          <div className="mt-6">
+            <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2"><MessageSquare className="h-5 w-5"/> Demandes de session</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {sessionRequests.map(req => (
+                <Card key={req.id} className="shadow-sm">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">{new Date(req.date).toLocaleDateString()} à {req.heure}</span>
+                      <Badge variant="outline">{req.type}</Badge>
+                    </div>
+                    <p className="text-gray-800 text-sm">Étudiant : {req.etudiant?.prenom} {req.etudiant?.nom}</p>
+                    {req.statut === 'EN_ATTENTE' ? (
+                      <div className="flex gap-2 pt-2">
+                        <Button size="sm" onClick={() => handleRequestAction(req, 'ACCEPTEE')} className="bg-green-600 hover:bg-green-700 text-white">Accepter</Button>
+                        <Button size="sm" variant="destructive" onClick={() => handleRequestAction(req, 'REFUSEE')}>Refuser</Button>
+                      </div>
+                    ) : (
+                      <Badge variant="outline" className="mt-2">{req.statut}</Badge>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Page Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -575,11 +647,44 @@ const Sessions = () => {
                   )}
                 </div>
               ) : (
-                <p>Sélectionnez une session pour voir les détails</p>
+                <div></div>
               )}
             </CardContent>
           </Card>
         </div>
+
+        {/* Modal acceptation */}
+        <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Compléter les informations</DialogTitle>
+            </DialogHeader>
+            {requestToAccept && (
+              <div className="space-y-4">
+                {requestToAccept.type === 'VIRTUEL' && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Lien de réunion</label>
+                    <Input value={acceptForm.meetingLink} onChange={e => setAcceptForm(f => ({ ...f, meetingLink: e.target.value }))} placeholder="https://meet.google.com/..." />
+                  </div>
+                )}
+                {requestToAccept.type === 'PRESENTIEL' && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Salle</label>
+                    <Input value={acceptForm.salle} onChange={e => setAcceptForm(f => ({ ...f, salle: e.target.value }))} placeholder="Ex: B12" />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Durée (minutes)</label>
+                  <Input type="number" min={15} step={15} value={acceptForm.duree} onChange={e => setAcceptForm(f => ({ ...f, duree: Number(e.target.value) }))} />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setAcceptDialogOpen(false)}>Annuler</Button>
+                  <Button onClick={submitAccept} disabled={(requestToAccept.type==='VIRTUEL' && !acceptForm.meetingLink) || (requestToAccept.type==='PRESENTIEL' && !acceptForm.salle)}>Valider</Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

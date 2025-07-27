@@ -10,6 +10,7 @@ import sessionRoutes from './routes/sessionRoutes';
 import juryRoutes from './routes/juryRoutes';
 import paiementRoutes from './routes/paiementRoutes';
 import notificationRoutes from './routes/notificationRoutes';
+import sessionRequestRoutes from './routes/sessionRequestRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 
 // Initialize environment variables
@@ -39,6 +40,7 @@ app.use('/api/jurys', juryRoutes);
 app.use('/api/paiements', paiementRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/session-requests', sessionRequestRoutes);
 
 // Basic route
 app.get('/', (req, res) => {
