@@ -4,9 +4,13 @@ import {
   getMemoires,
   getMemoireById,
   getMyMemoire,
+  uploadFinal,
+  validateFinalByEncadreur,
+  validateFinalByAdmin,
   updateMemoireStatus,
   updateMemoire,
-  addDocument
+  addDocument,
+  updateDocumentComment
 } from '../controllers/memoireController';
 import { authMiddleware, checkRole } from '../middleware/authMiddleware';
 
@@ -34,6 +38,24 @@ router.patch('/:id/status', updateMemoireStatus);
 router.put('/:id', checkRole(['ADMIN', 'ETUDIANT', 'ENCADREUR']), updateMemoire);
 
 // Ajouter un document au mémoire (ETUDIANT propriétaire uniquement)
-router.post('/:id/documents', checkRole(['ETUDIANT']), addDocument);
+import { upload } from '../middleware/uploadMiddleware';
+
+// ... other routes above unchanged
+
+// Ajouter un document au mémoire (upload fichier)
+// Dépôt final du mémoire
+router.post('/:id/depot-final', checkRole(['ETUDIANT']), upload.single('file'), uploadFinal);
+
+// Validation par l'encadreur
+router.post('/:id/validation-encadreur', checkRole(['ENCADREUR']), validateFinalByEncadreur);
+
+// Validation finale par l'admin
+router.post('/:id/validation-admin', checkRole(['ADMIN']), validateFinalByAdmin);
+
+// Version intermédiaire (documents)
+router.post('/:id/documents', checkRole(['ETUDIANT']), upload.single('file'), addDocument);
+
+// Commenter une version (encadreur)
+router.patch('/documents/:docId/comment', checkRole(['ENCADREUR']), updateDocumentComment);
 
 export default router; 

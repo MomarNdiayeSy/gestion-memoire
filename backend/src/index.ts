@@ -26,6 +26,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+import path from 'path';
+
 // Middleware pour parser le JSON et les cookies
 app.use(express.json());
 app.use(cookieParser());
@@ -41,6 +43,9 @@ app.use('/api/paiements', paiementRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/session-requests', sessionRequestRoutes);
+
+// Expose dossier uploads statique
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // Basic route
 app.get('/', (req, res) => {

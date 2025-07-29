@@ -66,6 +66,7 @@ const EncadreurDashboard = () => {
       SOUMIS: 50,
       EN_REVISION: 75,
       VALIDE: 100,
+    VALIDE_ADMIN: 100,
       SOUTENU: 100,
       REJETE: 0,
     };
@@ -73,12 +74,16 @@ const EncadreurDashboard = () => {
   }
 
   /* My Students list */
-  const myStudents = memoires.map((m: any) => ({
-    name: `${m.etudiant?.prenom || ''} ${m.etudiant?.nom || ''}`.trim(),
-    subject: m.titre || m.sujet?.titre || '',
-    progress: (m.progression === 0 && ['VALIDE','SOUTENU'].includes(m.status)) ? 100 : (m.progression ?? getDefaultProgression(m.status)),
-    status: m.status || 'En cours',
-  }));
+  const myStudents = memoires.map((m: any) => {
+    const baseProgress = (m.progression && m.progression > 0) ? m.progression : getDefaultProgression(m.status);
+    const progress = ['VALIDE', 'VALIDE_ADMIN', 'SOUTENU'].includes(m.status) ? 100 : baseProgress;
+    return {
+      name: `${m.etudiant?.prenom || ''} ${m.etudiant?.nom || ''}`.trim(),
+      subject: m.titre || m.sujet?.titre || '',
+      progress,
+      status: m.status || 'En cours',
+    };
+  });
 
   /* Upcoming sessions list */
   const upcomingSessions = upcomingSessionsAll

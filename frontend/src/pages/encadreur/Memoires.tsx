@@ -2,13 +2,26 @@ import React, { useState } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Search, Download, Eye, Filter, CheckCircle, Clock, XCircle, Edit, Award } from 'lucide-react';
+import { useToast } from "@/components/ui/use-toast";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { memoireApi } from '@/services/api';
 
 const Memoires = () => {
+  const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
+  const [selectedDoc, setSelectedDoc] = useState<any | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -19,9 +32,30 @@ const Memoires = () => {
   });
 
   /* ------------------------- Mutation accept/refuse ------------------------- */
+  // Mutation statuts classiques EN REVISION / VALIDÉ etc.
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: 'VALIDE' | 'REJETE' }) => memoireApi.updateStatus(id, { status }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['encadreur-memoires'] });
+    },
+  });
+
+  // Mutation validation finale (encadreur)
+  const validateFinalMutation = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: 'ACCEPTE' | 'REFUSE'; commentaire?: string }) =>
+      memoireApi.validateFinalEncadreur(id, action),
+    onSuccess: () => {
+      toast({ title: 'Action enregistrée' });
+      queryClient.invalidateQueries({ queryKey: ['encadreur-memoires'] });
+    },
+  });
+
+  // Mutation commentaire document
+  const commentMutation = useMutation({
+    mutationFn: ({ docId, commentaire }: { docId: string; commentaire: string }) =>
+      memoireApi.updateDocumentComment(docId, { commentaire }),
+    onSuccess: () => {
+      toast({ title: 'Commentaire enregistré' });
       queryClient.invalidateQueries({ queryKey: ['encadreur-memoires'] });
     },
   });
@@ -51,24 +85,33 @@ const Memoires = () => {
     }
   };
 
-  const getProgress = (status: string): number => {
+  const getProgress = (memoire: any): number => {
+    if (memoire.progression && memoire.progression > 0) {
+      return memoire.progression;
+    }
+    const status = memoire.status;
     switch (status) {
       case 'EN_COURS':
         return 25;
       case 'SOUMIS':
         return 50;
+      case 'SOUMIS_FINAL':
+        return 75;
+      case 'VALIDE_ENCADREUR':
+        return 85;
       case 'EN_REVISION':
         return 75;
       case 'SOUTENU':
         return 100;
       case 'VALIDE':
+      case 'VALIDE_ADMIN':
         return 100;
       default:
         return 0;
     }
   };
 
-  const filteredMemoires = memoires.filter(memoire => {
+  const filteredMemoires = memoires.filter((memoire: any) => {
     const étudiantNomComplet = `${memoire.etudiant?.prenom ?? ''} ${memoire.etudiant?.nom ?? ''}`.toLowerCase();
     const sujetTitre = memoire.sujet?.titre?.toLowerCase() ?? '';
     const matchesSearch = memoire.titre.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -274,7 +317,7 @@ const Memoires = () => {
                     <div className="flex items-center space-x-2">
                       <Badge className={getStatusBadge(memoire.status)}>
                         {getStatusIcon(memoire.status)}
-                        <span className="ml-1 capitalize">{memoire.status.replace('_', ' ')}</span>
+                        <span className="ml-1 capitalize">{memoire.status.replace('_', ' ').toLowerCase()}</span>
                       </Badge>
                     </div>
                   </div>
@@ -283,37 +326,70 @@ const Memoires = () => {
                   <div className="mb-4">
                     <div className="flex items-center justify-between text-sm mb-2">
                       <span className="text-gray-600">Progression</span>
-                      <span className="font-medium text-gray-900">{getProgress(memoire.status)}%</span>
+                      <span className="font-medium text-gray-900">{getProgress(memoire)}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
                         className="bg-gradient-to-r from-blue-600 to-violet-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${getProgress(memoire.status)}%` }}
+                        style={{ width: `${getProgress(memoire)}%` }}
                       />
                     </div>
                   </div>
 
+                  {/* Versions / Documents */}
+                  {memoire.documents && memoire.documents.length > 0 && (
+                    <div className="mb-4 space-y-2">
+                      <h5 className="font-medium text-gray-700">Versions</h5>
+                      {memoire.documents.map((doc: any) => (
+                        <div key={doc.id} className="flex items-center justify-between bg-gray-50 p-3 rounded">
+                          <div className="text-sm flex-1">
+                            <span className="font-medium mr-2">{doc.numero}</span>
+                            <span className="text-gray-500 mr-4">{new Date(doc.date).toLocaleDateString()}</span>
+                            {doc.commentaire && doc.commentaire.trim() !== '' && (
+                              <span className="text-green-700">Commentaire ajouté</span>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Button variant="outline" size="sm" onClick={() => window.open(doc.fichierUrl, '_blank')}>
+                              <Eye className="h-4 w-4 mr-1" />Voir
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedDoc(doc);
+                                setCommentText(doc.commentaire ?? '');
+                                setIsCommentDialogOpen(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4 mr-1" />Commenter
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* File Info and Actions */}
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-600">
-                      {memoire.documents && memoire.documents.length ? (
+                      {memoire.fichierUrl ? (
                         <div className="flex items-center space-x-4">
-                          <span>Fichier: {memoire.documents[0]?.nom ?? '—'}</span>
-                          <span>Taille: {memoire.documents[0]?.taille ?? 'Taille inconnue'}</span>
-                          <span>Déposé le: {memoire.documents[0]?.createdAt ? new Date(memoire.documents[0].createdAt).toLocaleDateString() : '—'}</span>
+                          <span>Fichier final</span>
+                          <span>Déposé le: {memoire.dateDepot ? new Date(memoire.dateDepot).toLocaleDateString() : '—'}</span>
                         </div>
                       ) : (
-                        <span className="text-orange-600">Aucun fichier déposé</span>
+                        <span className="text-orange-600">Aucun fichier final</span>
                       )}
                     </div>
                     <div className="flex space-x-2">
-                      {memoire.status === 'SOUMIS' && (
+                      {memoire.status === 'SOUMIS_FINAL' && (
                         <>
                           <Button
                             size="sm"
                             variant="default"
                             disabled={updateStatusMutation.isPending}
-                            onClick={() => updateStatusMutation.mutate({ id: memoire.id, status: 'VALIDE' })}
+                            onClick={() => validateFinalMutation.mutate({ id: memoire.id, action: 'ACCEPTE' })}
                           >
                             <CheckCircle className="h-4 w-4 mr-2" />
                             Accepter
@@ -322,22 +398,18 @@ const Memoires = () => {
                             size="sm"
                             variant="destructive"
                             disabled={updateStatusMutation.isPending}
-                            onClick={() => updateStatusMutation.mutate({ id: memoire.id, status: 'REJETE' })}
+                            onClick={() => validateFinalMutation.mutate({ id: memoire.id, action: 'REFUSE' })}
                           >
                             <XCircle className="h-4 w-4 mr-2" />
                             Refuser
                           </Button>
                         </>
                       )}
-                      {memoire.documents && memoire.documents.length && (
+                      {memoire.fichierUrl && (
                         <>
-                          <Button variant="outline" size="sm">
+                          <Button variant="outline" size="sm" onClick={() => window.open(memoire.fichierUrl, '_blank')}>
                             <Eye className="h-4 w-4 mr-2" />
                             Consulter
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            <Download className="h-4 w-4 mr-2" />
-                            Télécharger
                           </Button>
                         </>
                       )}
@@ -348,9 +420,37 @@ const Memoires = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Dialog Commentaire */}
+        <Dialog open={isCommentDialogOpen} onOpenChange={setIsCommentDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Commenter le document {selectedDoc?.numero}</DialogTitle>
+            </DialogHeader>
+            <Textarea
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="Votre commentaire..."
+              className="min-h-[120px]"
+            />
+            <div className="flex justify-end space-x-2 mt-4">
+              <Button variant="outline" onClick={() => setIsCommentDialogOpen(false)}>Annuler</Button>
+              <Button
+                onClick={() => {
+                  if (!selectedDoc) return;
+                  commentMutation.mutate({ docId: selectedDoc.id, commentaire: commentText });
+                }}
+                disabled={commentMutation.isPending}
+              >
+                Enregistrer
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
 };
+
 
 export default Memoires;

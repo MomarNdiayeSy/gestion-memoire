@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { memoireApi } from '@/services/api';
+import { useAuth } from '@/stores/authStore';
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -19,25 +22,25 @@ import {
   Clock,
   FileText,
   GraduationCap,
-  MoreVertical,
   Upload,
   User
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
+
+interface Version {
+  description?: string;
+  id: string;
+  numero: string;
+  date: string;
+  commentaire: string;
+  fichierUrl: string;
+}
 
 interface Memoire {
   id: string;
   titre: string;
   description: string;
-  statut: 'EN_COURS' | 'EN_REVISION' | 'VALIDE' | 'SOUTENANCE_PLANIFIEE';
+  status: 'EN_COURS' | 'EN_REVISION' | 'VALIDE' | 'SOUTENANCE_PLANIFIEE';
   progression: number;
   dateSoutenance?: string;
   encadreur: {
@@ -50,61 +53,87 @@ interface Memoire {
     date: string;
     auteur: string;
   }[];
-  versions: {
-    id: string;
-    numero: string;
-    date: string;
-    commentaire: string;
-    fichier: string;
-  }[];
+  versions: Version[];
+  documents: Version[];
 }
 
 const MyMemoir = () => {
-  const { toast } = useToast();
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = React.useState(false);
-  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const safeArray = <T,>(arr: T[] | undefined | null): T[] => Array.isArray(arr) ? arr : [];
 
-  // Données fictives pour le mémoire
-  const [memoire] = React.useState<Memoire>({
-    id: '1',
-    titre: 'Développement d\'une application de gestion de mémoires',
-    description: 'Application web permettant la gestion des mémoires de fin d\'études, incluant le suivi des étudiants, la gestion des soutenances et les paiements.',
-    statut: 'EN_COURS',
-    progression: 75,
-    encadreur: {
-      nom: 'Diop',
-      prenom: 'Abdoulaye'
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const { data: memoire, isFetching } = useQuery<any | null>({
+    queryKey: ['my-memoire'],
+    queryFn: () => memoireApi.getMy(),
+  });
+
+  const commentsCount = memoire ? safeArray((memoire as any).commentaires).length + safeArray((memoire as any).documents).filter((d: any) => d.commentaire && d.commentaire.trim() !== '').length : 0;
+
+  const getProgress = (memoire: any): number => {
+    if (memoire.progression && memoire.progression > 0) {
+      return memoire.progression;
+    }
+    const status = memoire.status;
+    switch (status) {
+      case 'EN_COURS':
+        return 25;
+      case 'SOUMIS':
+        return 50;
+      case 'SOUMIS_FINAL':
+        return 75;
+      case 'VALIDE_ENCADREUR':
+        return 85;
+      case 'EN_REVISION':
+        return 75;
+      case 'SOUTENU':
+        return 100;
+      case 'VALIDE':
+      case 'VALIDE_ADMIN':
+        return 100;
+      default:
+        return 0;
+    }
+  };
+
+  const finalMutation = useMutation({
+    mutationFn: async (payload: { file: File; description: string }) => {
+      if (!memoire) throw new Error('Aucun mémoire');
+      const fd = new FormData();
+      fd.append('file', payload.file);
+      fd.append('description', payload.description);
+      return await memoireApi.depositFinal(memoire.id, fd);
     },
-    commentaires: [
-      {
-        id: '1',
-        texte: 'La méthodologie est bien détaillée, mais il faudrait approfondir la partie sur les tests unitaires.',
-        date: '2024-03-15',
-        auteur: 'Dr. Diop'
-      },
-      {
-        id: '2',
-        texte: 'Les diagrammes de séquence sont à revoir pour mieux illustrer les interactions.',
-        date: '2024-03-14',
-        auteur: 'Dr. Diop'
-      }
-    ],
-    versions: [
-      {
-        id: '1',
-        numero: 'v1.0',
-        date: '2024-03-10',
-        commentaire: 'Première version complète',
-        fichier: 'memoire_v1.0.pdf'
-      },
-      {
-        id: '2',
-        numero: 'v1.1',
-        date: '2024-03-15',
-        commentaire: 'Corrections suite aux retours',
-        fichier: 'memoire_v1.1.pdf'
-      }
-    ]
+    onSuccess: () => {
+      toast({ title: 'Mémoire final déposé', description: 'En attente de validation de votre encadreur' });
+      setIsUploadDialogOpen(false);
+      setSelectedFile(null);
+      queryClient.invalidateQueries({ queryKey: ['my-memoire'] });
+    },
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: async (payload: { numero: string; description: string; file: File }) => {
+      if (!memoire) throw new Error('Aucun mémoire');
+      const formData = new FormData();
+      formData.append('file', payload.file);
+      formData.append('description', payload.description);
+      formData.append('numero', payload.numero);
+      
+      return await memoireApi.addDocument(memoire.id, formData);
+    },
+    onSuccess: () => {
+      toast({ title: 'Version uploadée', description: 'La nouvelle version a été envoyée' });
+      setIsUploadDialogOpen(false);
+      setSelectedFile(null);
+      queryClient.invalidateQueries({ queryKey: ['my-memoire'] });
+    },
+    onError: () => {
+      toast({ title: 'Erreur', description: "Échec de l'upload", variant: 'destructive' });
+    }
   });
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,16 +145,12 @@ const MyMemoir = () => {
 
   const handleUploadVersion = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedFile) return;
+    if (!selectedFile || !memoire) return;
 
     const formData = new FormData(event.currentTarget);
-    
-    toast({
-      title: "Version uploadée",
-      description: "La nouvelle version a été uploadée avec succès",
-    });
-    setIsUploadDialogOpen(false);
-    setSelectedFile(null);
+    const numero = formData.get('numero') as string;
+    const description = formData.get('description') as string;
+    uploadMutation.mutate({ numero, description, file: selectedFile });
   };
 
   const getStatusBadge = (status: string) => {
@@ -147,6 +172,22 @@ const MyMemoir = () => {
     if (progress >= 25) return "bg-yellow-500";
     return "bg-red-500";
   };
+
+  if (isFetching) return (
+    <DashboardLayout allowedRoles={['ETUDIANT']}>
+      <div className="p-8 text-center">Chargement...</div>
+    </DashboardLayout>
+  );
+
+  if (!memoire) {
+    return (
+      <DashboardLayout allowedRoles={['ETUDIANT']}>
+        <div className="p-8 text-center">Vous n'avez pas encore de mémoire.</div>
+      </DashboardLayout>
+    );
+  }
+
+  const versions: Version[] = safeArray(((memoire as any).versions ?? (memoire as any).documents) as Version[]);
 
   return (
     <DashboardLayout allowedRoles={['ETUDIANT']}>
@@ -177,19 +218,19 @@ const MyMemoir = () => {
                     Numéro de version
                   </label>
                   <Input
-                    id="version"
-                    name="version"
+                    id="numero"
+                    name="numero"
                     placeholder="ex: v1.2"
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium" htmlFor="commentaire">
-                    Commentaire
+                  <label className="text-sm font-medium" htmlFor="description">
+                    Description
                   </label>
                   <Textarea
-                    id="commentaire"
-                    name="commentaire"
+                    id="description"
+                    name="description"
                     placeholder="Décrivez les modifications apportées"
                     required
                   />
@@ -230,7 +271,7 @@ const MyMemoir = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Progression</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-2">{memoire.progression}%</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-2">{getProgress(memoire)}%</p>
                 </div>
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                   <GraduationCap className="h-6 w-6 text-blue-600" />
@@ -245,7 +286,7 @@ const MyMemoir = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Versions</p>
                   <p className="text-2xl font-bold text-purple-600 mt-2">
-                    {memoire.versions.length}
+                    {versions.length}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -261,7 +302,7 @@ const MyMemoir = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Commentaires</p>
                   <p className="text-2xl font-bold text-green-600 mt-2">
-                    {memoire.commentaires.length}
+                    {commentsCount}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -285,8 +326,8 @@ const MyMemoir = () => {
               </div>
 
               <div className="flex items-center space-x-4">
-                <Badge className={getStatusBadge(memoire.statut)}>
-                  {memoire.statut}
+                <Badge className={getStatusBadge(memoire.status)}>
+                  {memoire.status}
                 </Badge>
                 {memoire.dateSoutenance && (
                   <Badge variant="outline">
@@ -306,8 +347,8 @@ const MyMemoir = () => {
                 <p className="text-sm font-medium text-gray-600">Progression globale</p>
                 <div className="w-full h-2 bg-gray-200 rounded-full">
                   <div
-                    className={`h-2 rounded-full ${getProgressColor(memoire.progression)}`}
-                    style={{ width: `${memoire.progression}%` }}
+                    className={`h-2 rounded-full ${getProgressColor(getProgress(memoire))}`}
+                    style={{ width: `${getProgress(memoire)}%` }}
                   />
                 </div>
               </div>
@@ -322,45 +363,51 @@ const MyMemoir = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {memoire.versions.map((version) => (
-                <div
-                  key={version.id}
-                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <FileText className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">Version {version.numero}</h3>
-                      <p className="text-sm text-gray-500">{version.commentaire}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Calendar className="h-4 w-4 mr-2" />
-                        {new Date(version.date).toLocaleDateString()}
+              {safeArray((memoire as any).documents)
+                .slice()
+                .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .map((version: any) => (
+                  <div
+                    key={version.id}
+                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <FileText className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-gray-900">Version {version.numero}</h3>
+                        <p className="text-sm text-gray-500">{version.description}</p>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">
-                      Télécharger
-                    </Button>
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          {new Date(version.date).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => window.open(version.fichierUrl, '_blank')}>
+                        Télécharger
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           </CardContent>
         </Card>
 
-        {/* Commentaires */}
+        {/* Commentaires fusionnés */}
         <Card className="border-0 shadow-lg">
           <CardHeader>
             <CardTitle>Commentaires de l'Encadreur</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {memoire.commentaires.map((commentaire) => (
+              {/* Commentaires généraux */}
+              {safeArray((memoire as any).commentaires)
+              .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              .map((commentaire: any) => (
                 <div
                   key={commentaire.id}
                   className="p-4 border border-gray-200 rounded-lg"
@@ -379,12 +426,38 @@ const MyMemoir = () => {
                 </div>
               ))}
 
-              {memoire.commentaires.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p>Aucun commentaire pour le moment</p>
+              {/* Commentaires par version */}
+              {safeArray((memoire as any).documents)
+              .slice()
+              .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              .map((doc: any) => (
+                <div key={doc.id} className="p-4 border border-gray-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <FileText className="h-4 w-4 text-gray-400" />
+                      <span className="font-medium text-gray-900">Version {doc.numero}</span>
+                    </div>
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Clock className="h-4 w-4 mr-2" />
+                      {new Date(doc.date).toLocaleDateString()}
+                    </div>
+                  </div>
+                  {doc.commentaire && doc.commentaire.trim() !== '' ? (
+                    <p className="text-gray-600 whitespace-pre-line">{doc.commentaire}</p>
+                  ) : (
+                    <p className="italic text-gray-500">Aucun commentaire pour cette version</p>
+                  )}
                 </div>
-              )}
+              ))}
+
+              {/* Si aucun commentaire */}
+              {safeArray((memoire as any).commentaires).length === 0 &&
+                safeArray((memoire as any).documents).every((d: any) => !d.commentaire || d.commentaire.trim() === '') && (
+                  <div className="text-center py-8 text-gray-500">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p>Aucun commentaire pour le moment</p>
+                  </div>
+                )}
             </div>
           </CardContent>
         </Card>

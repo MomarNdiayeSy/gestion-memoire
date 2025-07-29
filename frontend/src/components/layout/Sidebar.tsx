@@ -14,6 +14,7 @@ import {
   FileSpreadsheet,
   Receipt,
   Wallet,
+  CheckCircle,
   PieChart
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -33,7 +34,8 @@ const Sidebar = () => {
     { icon: BarChart, label: 'Tableau de bord', path: '/admin/dashboard' },
     { icon: Users, label: 'Utilisateurs', path: '/admin/users' },
     { icon: BookMarked, label: 'Sujets', path: '/admin/subjects' },
-    { icon: FileText, label: 'Mémoires', path: '/admin/memoires' },
+    { icon: FileText, label: 'Catalogue mémoires', path: '/admin/memoireManagement' },
+    { icon: CheckCircle, label: 'Validation mémoires', path: '/admin/validationMemoires' },
     { icon: GraduationCap, label: 'Jurys', path: '/admin/jurys' },
     { icon: Receipt, label: 'Paiements', path: '/admin/payments' },
     { icon: PieChart, label: 'Statistiques', path: '/admin/statistics' }
@@ -52,7 +54,6 @@ const Sidebar = () => {
     { icon: BookMarked, label: 'Choix du sujet', path: '/etudiant/subjects' },
     { icon: BookOpen, label: 'Mon mémoire', path: '/etudiant/memoire' },
     { icon: Video, label: 'Sessions', path: '/etudiant/sessions' },
-    { icon: FileSpreadsheet, label: 'Documents', path: '/etudiant/documents' },
     { icon: Wallet, label: 'Paiement', path: '/etudiant/payment' }
   ];
 

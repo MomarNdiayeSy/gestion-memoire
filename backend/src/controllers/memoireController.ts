@@ -11,6 +11,7 @@ export const getMyMemoire = async (req: Request, res: Response) => {
       where: { etudiantId: etudiantId },
       include: {
         sujet: true,
+        documents: true,
         encadreur: {
           select: { nom: true, prenom: true }
         }
@@ -295,7 +296,7 @@ export const updateMemoire = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Ce mémoire ne peut plus être modifié" });
     }
 
-    // Préparer le payload de mise à jour en ne gardant que les champs définis
+    // Préparer le payload de mise à jour
     const payload: any = {};
     if (titre !== undefined) payload.titre = titre;
     if (description !== undefined) payload.description = description;
@@ -313,37 +314,158 @@ export const updateMemoire = async (req: Request, res: Response) => {
     res.json(updatedMemoire);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Erreur lors de la mise à jour du mémoire" });
+    res.status(500).json({ message: 'Erreur lors de la mise à jour du mémoire' });
   }
 };
 
-// Ajouter un document au mémoire
+// Ajouter un document au mémoire (upload fichier)
+// Dépôt de la version finale par l'étudiant
+export const uploadFinal = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).user?.userId;
+    const file = (req as any).file as Express.Multer.File;
+    const commentaire = (req.body.commentaire as string) || '';
+
+    if (!file) return res.status(400).json({ message: 'Aucun fichier fourni' });
+
+    // Vérifier que l'utilisateur est l'étudiant propriétaire
+    const memoire = await prisma.memoire.findUnique({ where: { id } });
+    if (!memoire) return res.status(404).json({ message: 'Mémoire non trouvé' });
+    if (userId !== memoire.etudiantId)
+      return res.status(403).json({ message: 'Non autorisé' });
+
+    // Mise à jour du mémoire avec le fichier final et dateDepot
+    const updated = await prisma.memoire.update({
+      where: { id },
+      data: {
+        fichierUrl: `${req.protocol}://${req.get('host')}/uploads/${file.filename}`,
+        dateDepot: new Date(),
+        status: 'SOUMIS_FINAL',
+      },
+    });
+
+    // TODO: créer notification pour l'encadreur
+
+    res.status(200).json(updated);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur lors du dépôt final" });
+  }
+};
+
+// Validation du mémoire final par l'encadreur
+export const validateFinalByEncadreur = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).user?.userId;
+    const { action, commentaire = '' } = req.body as { action: 'ACCEPTE' | 'REFUSE'; commentaire?: string };
+
+    const memoire = await prisma.memoire.findUnique({ where: { id } });
+    if (!memoire) return res.status(404).json({ message: 'Mémoire non trouvé' });
+    if (userId !== memoire.encadreurId)
+      return res.status(403).json({ message: 'Non autorisé' });
+
+    let newStatus = memoire.status;
+    if (action === 'ACCEPTE') newStatus = 'VALIDE_ENCADREUR';
+    else if (action === 'REFUSE') newStatus = 'EN_REVISION';
+
+    const updated = await prisma.memoire.update({
+      where: { id },
+      data: { status: newStatus },
+    });
+
+    // TODO: historique + notification
+
+    res.json(updated);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur validation encadreur' });
+  }
+};
+
+// Validation finale par l'admin
+export const validateFinalByAdmin = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { action } = req.body as { action: 'ACCEPTE' | 'REFUSE' };
+
+    const memoire = await prisma.memoire.findUnique({ where: { id } });
+    if (!memoire) return res.status(404).json({ message: 'Mémoire non trouvé' });
+
+    let newStatus = memoire.status;
+    if (action === 'ACCEPTE') newStatus = 'VALIDE_ADMIN';
+    else if (action === 'REFUSE') newStatus = 'EN_REVISION';
+
+    const updated = await prisma.memoire.update({ where: { id }, data: { status: newStatus } });
+
+    // TODO: historique + notification
+
+    res.json(updated);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur validation admin' });
+  }
+};
+
+// --------------------------------------
+// Encadreur: ajouter / mettre à jour le commentaire d'un document (version)
+// PATCH /documents/:docId/comment { commentaire: string }
+export const updateDocumentComment = async (req: Request, res: Response) => {
+  try {
+    const { docId } = req.params as { docId: string };
+    const { commentaire = '' } = req.body as { commentaire: string };
+    const encadreurId = (req as any).user?.userId;
+
+    // Récupérer le document avec son mémoire
+    const document = await prisma.document.findUnique({
+      where: { id: docId },
+      include: { memoire: true },
+    });
+
+    if (!document) return res.status(404).json({ message: 'Document non trouvé' });
+
+    if (document.memoire.encadreurId !== encadreurId) {
+      return res.status(403).json({ message: 'Non autorisé' });
+    }
+
+    const updatedDoc = await prisma.document.update({
+      where: { id: docId },
+      data: { commentaire },
+    });
+
+    // TODO: notification à l'étudiant
+
+    res.json(updatedDoc);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur lors de la mise à jour du commentaire" });
+  }
+
+};
+
 export const addDocument = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { nom, url, type } = req.body;
-    const userId = req.user?.userId;
+    const { numero = '1', description = '' } = req.body;
+    const userId = (req as any).user?.userId;
+    const file = (req as any).file as Express.Multer.File;
 
-    const memoire = await prisma.memoire.findUnique({
-      where: { id }
-    });
+    if (!file) return res.status(400).json({ message: 'Aucun fichier fourni' });
 
-    if (!memoire) {
-      return res.status(404).json({ message: "Mémoire non trouvé" });
-    }
-
-    // Vérifier que c'est bien l'étudiant propriétaire
-    if (userId !== memoire.etudiantId) {
-      return res.status(403).json({ message: "Vous n'êtes pas autorisé à ajouter des documents à ce mémoire" });
-    }
+    const memoire = await prisma.memoire.findUnique({ where: { id } });
+    if (!memoire) return res.status(404).json({ message: 'Mémoire non trouvé' });
+    if (userId !== memoire.etudiantId)
+      return res.status(403).json({ message: 'Non autorisé' });
 
     const document = await prisma.document.create({
       data: {
-        nom,
-        url,
-        type,
-        memoireId: id
-      }
+        numero: numero.toString(),
+        description,
+        commentaire: '',
+        fichierUrl: `${req.protocol}://${req.get('host')}/uploads/${file.filename}`,
+        memoireId: id,
+      },
     });
 
     res.status(201).json(document);
@@ -351,4 +473,4 @@ export const addDocument = async (req: Request, res: Response) => {
     console.error(error);
     res.status(500).json({ message: "Erreur lors de l'ajout du document" });
   }
-}; 
+};

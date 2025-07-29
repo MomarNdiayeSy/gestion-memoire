@@ -13,6 +13,7 @@ import NotFound from './pages/NotFound';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
 import SubjectManagement from './pages/admin/SubjectManagement';
+import AdminMemoires from './pages/admin/Memoires';
 import MemoireManagement from './pages/admin/MemoireManagement';
 import JuryManagement from './pages/admin/JuryManagement';
 import PaymentManagement from './pages/admin/PaymentManagement';
@@ -30,7 +31,6 @@ import EtudiantDashboard from './pages/etudiant/EtudiantDashboard';
 import SubjectSelection from './pages/etudiant/SubjectSelection';
 import MyMemoir from './pages/etudiant/MyMemoir';
 import MentoringSessions from './pages/etudiant/MentoringSessions';
-import Documents from './pages/etudiant/Documents';
 import Payment from './pages/etudiant/Payment';
 
 function App() {
@@ -93,10 +93,18 @@ function App() {
           }
         />
         <Route
-          path="/admin/memoires"
+          path="/admin/memoireManagement"
           element={
             <ProtectedRoute allowedRoles={['ADMIN']}>
               <MemoireManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/validationMemoires"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <AdminMemoires />
             </ProtectedRoute>
           }
         />
@@ -199,14 +207,6 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['ETUDIANT']}>
               <MentoringSessions />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/etudiant/documents"
-          element={
-            <ProtectedRoute allowedRoles={['ETUDIANT']}>
-              <Documents />
             </ProtectedRoute>
           }
         />

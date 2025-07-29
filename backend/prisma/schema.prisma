@@ -173,17 +173,17 @@ model SessionRequest {
 }
 
 model Document {
-  id          String    @id @default(uuid())
-  nom         String
-  url         String
-  type        String    // Type de document (rapport, annexe, etc.)
-  version     Int       @default(1)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id          String   @id @default(uuid())
+  numero      String
+  commentaire String?
+  description String?
+  fichierUrl  String
+  date        DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
   memoireId   String
-  memoire     Memoire   @relation(fields: [memoireId], references: [id])
+  memoire     Memoire  @relation(fields: [memoireId], references: [id])
 }
 
 model Jury {

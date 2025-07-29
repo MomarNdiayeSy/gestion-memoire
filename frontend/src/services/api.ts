@@ -175,13 +175,44 @@ export const memoireApi = {
     return response.data;
   },
 
-  // Ajouter un document
-  addDocument: async (id: string, data: {
-    nom: string;
-    url: string;
-    type: string;
-  }) => {
-    const response = await api.post(`/memoires/${id}/documents`, data);
+  // Déposer la version finale (upload fichier)
+  depositFinal: async (id: string, formData: FormData) => {
+    const response = await api.post(`/memoires/${id}/depot-final`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  // Validation finale par l'encadreur (accepte ou refuse)
+  validateFinalEncadreur: async (
+    id: string,
+    action: 'ACCEPTE' | 'REFUSE',
+    commentaire?: string,
+  ) => {
+    const response = await api.post(`/memoires/${id}/validation-encadreur`, {
+      action,
+      commentaire,
+    });
+    return response.data;
+  },
+
+  // Validation finale par l'admin
+  validateFinalAdmin: async (id: string, action: 'ACCEPTE' | 'REFUSE') => {
+    const response = await api.post(`/memoires/${id}/validation-admin`, { action });
+    return response.data;
+  },
+
+  // Ajouter un document (upload fichier)
+  addDocument: async (id: string, formData: FormData) => {
+    const response = await api.post(`/memoires/${id}/documents`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+  ,
+  // Mettre à jour le commentaire d'un document (encadreur)
+  updateDocumentComment: async (docId: string, data: { commentaire: string }) => {
+    const response = await api.patch(`/memoires/documents/${docId}/comment`, data);
     return response.data;
   }
 };
