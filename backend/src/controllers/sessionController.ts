@@ -93,8 +93,26 @@ export const createSession = async (req: Request, res: Response) => {
   }
 };
 
+// --- Helper: Annuler les sessions dépassées (>24h)
+const cancelExpiredSessions = async () => {
+  const threshold = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  try {
+    await prisma.session.updateMany({
+      where: {
+        status: { in: ['PLANIFIE', 'PLANIFIEE'] },
+        date: { lt: threshold },
+      },
+      data: { status: 'ANNULEE' },
+    });
+  } catch (e) {
+    console.error('Erreur auto-annulation sessions', e);
+  }
+};
+
 // Obtenir toutes les sessions
 export const getSessions = async (req: Request, res: Response) => {
+  // Mise à jour automatique des sessions expirées
+  await cancelExpiredSessions();
   try {
     const userRole = req.user?.role;
     const userId = req.user?.userId;
@@ -221,6 +239,10 @@ export const visaSession = async (req: Request, res: Response) => {
 
     const session = await prisma.session.findUnique({ where: { id } });
     if (!session) return res.status(404).json({ message: 'Session non trouvée' });
+    // Interdire le visa si la session est annulée
+    if (session.status === 'ANNULEE') {
+      return res.status(400).json({ message: 'Visa impossible sur une session annulée' });
+    }
 
     // Vérification de l'auteur du visa
     if (type === 'ENCADREUR' && userId !== session.encadreurId) {

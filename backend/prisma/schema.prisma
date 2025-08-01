@@ -24,6 +24,7 @@ enum MemoireStatus {
   SOUMIS
   EN_REVISION
   VALIDE
+  VALIDE_ADMIN
   REJETE
   SOUTENU
 }
@@ -54,74 +55,75 @@ enum JuryStatus {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  password      String
-  nom           String
-  prenom        String
-  role          String    // ADMIN, ENCADREUR, ETUDIANT
-  specialite    String?   // Pour les encadreurs
-  matricule     String?   // Pour les étudiants
-  telephone     String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id         String   @id @default(uuid())
+  email      String   @unique
+  password   String
+  nom        String
+  prenom     String
+  role       String // ADMIN, ENCADREUR, ETUDIANT
+  specialite String? // Pour les encadreurs
+  matricule  String? // Pour les étudiants
+  telephone  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   // Relations
-  memoiresEncadres    Memoire[]  @relation("Encadreur")
-  memoireEtudiant     Memoire?   @relation("Etudiant")
-  sessionsEncadreur   Session[]  @relation("EncadreurSessions")
-  sessionsEtudiant    Session[]  @relation("EtudiantSessions")
-  sujetsEncadres      Sujet[]    @relation("EncadreurSujets")
-  paiements           Paiement[]
-  notifications       Notification[]
-  jurysEncadreur1     Jury[]     @relation("JuryEncadreur1")
-  jurysEncadreur2     Jury[]     @relation("JuryEncadreur2")
-  jurysEncadreur3     Jury[]     @relation("JuryEncadreur3")
+  memoiresEncadres         Memoire[]        @relation("Encadreur")
+  memoireEtudiant          Memoire?         @relation("Etudiant")
+  sessionsEncadreur        Session[]        @relation("EncadreurSessions")
+  sessionsEtudiant         Session[]        @relation("EtudiantSessions")
+  sujetsEncadres           Sujet[]          @relation("EncadreurSujets")
+  paiements                Paiement[]
+  notifications            Notification[]
+  jurysEncadreur1          Jury[]           @relation("JuryEncadreur1")
+  jurysEncadreur2          Jury[]           @relation("JuryEncadreur2")
+  jurysEncadreur3          Jury[]           @relation("JuryEncadreur3")
   sessionRequestsEtudiant  SessionRequest[] @relation("SessionRequestEtudiant")
   sessionRequestsEncadreur SessionRequest[] @relation("SessionRequestEncadreur")
 }
 
 model Memoire {
-  id              String        @id @default(uuid())
-  titre           String
-  description     String
-  status          String        // EN_COURS, SOUMIS, VALIDE, REJETE, SOUTENU
-  fichierUrl      String?       // URL du fichier PDF
-  motsCles        String[]      // Mots-clés pour la recherche
-  dateDepot       DateTime?     // Date de dépôt du mémoire final
-  dateSoutenance  DateTime?     // Date de soutenance si status = SOUTENU
-  note            Float?        // Note finale après soutenance
-  mention         String?       // Mention obtenue
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  progression Int @default(0)
+  id             String        @id @default(uuid())
+  titre          String
+  description    String
+  status         MemoireStatus // EN_COURS, SOUMIS, VALIDE, REJETE, SOUTENU
+  fichierUrl     String? // URL du fichier PDF
+  motsCles       String[] // Mots-clés pour la recherche
+  dateDepot      DateTime? // Date de dépôt du mémoire final
+  dateSoutenance DateTime? // Date de soutenance si status = SOUTENU
+  note           Float? // Note finale après soutenance
+  mention        String? // Mention obtenue
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  progression    Int           @default(0)
+  published      Boolean       @default(false)
 
   // Relations
-  etudiantId      String       @unique
-  etudiant        User         @relation("Etudiant", fields: [etudiantId], references: [id])
-  encadreurId     String
-  encadreur       User         @relation("Encadreur", fields: [encadreurId], references: [id])
-  sujetId         String
-  sujet           Sujet        @relation(fields: [sujetId], references: [id])
-  documents       Document[]
-  jury            Jury?
-  historique      HistoriqueMemoireStatus[]
+  etudiantId  String                    @unique
+  etudiant    User                      @relation("Etudiant", fields: [etudiantId], references: [id])
+  encadreurId String
+  encadreur   User                      @relation("Encadreur", fields: [encadreurId], references: [id])
+  sujetId     String
+  sujet       Sujet                     @relation(fields: [sujetId], references: [id])
+  documents   Document[]
+  jury        Jury?
+  historique  HistoriqueMemoireStatus[]
 }
 
 model Sujet {
-  id              String      @id @default(uuid())
-  titre           String
-  description     String
-  status          String      // EN_ATTENTE, VALIDE, REJETE, ATTRIBUE
-  motsCles        String[]    // Mots-clés pour la recherche
-  dateValidation  DateTime?   // Date de validation par l'admin
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id             String    @id @default(uuid())
+  titre          String
+  description    String
+  status         String // EN_ATTENTE, VALIDE, REJETE, ATTRIBUE
+  motsCles       String[] // Mots-clés pour la recherche
+  dateValidation DateTime? // Date de validation par l'admin
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   // Relations
-  encadreurId     String
-  encadreur       User        @relation("EncadreurSujets", fields: [encadreurId], references: [id])
-  memoires        Memoire[]
+  encadreurId String
+  encadreur   User      @relation("EncadreurSujets", fields: [encadreurId], references: [id])
+  memoires    Memoire[]
 }
 
 enum SessionType {
@@ -131,45 +133,45 @@ enum SessionType {
 
 model Session {
   id            String      @id @default(uuid())
-  numero        Int @default(1)
+  numero        Int         @default(1)
   date          DateTime
-  duree         Int         // en minutes
-  status        String      // PLANIFIE, TERMINE, ANNULE
+  duree         Int // en minutes
+  status        String // PLANIFIE, TERMINE, ANNULE
   type          SessionType @default(PRESENTIEL) // PRESENTIEL ou VIRTUEL
-  meetingLink   String?     // Lien de réunion pour les sessions virtuelles
-  salle         String?     // Salle pour les sessions présentielle
-  rapport       String?     // Rapport de la séance
-  remarques     String?     // Remarques de l'encadreur
+  meetingLink   String? // Lien de réunion pour les sessions virtuelles
+  salle         String? // Salle pour les sessions présentielle
+  rapport       String? // Rapport de la séance
+  remarques     String? // Remarques de l'encadreur
   visaEncadreur Boolean     @default(false)
   visaEtudiant  Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  @@unique([encadreurId, numero])
-
   // Relations
-  encadreurId   String
-  encadreur     User        @relation("EncadreurSessions", fields: [encadreurId], references: [id])
-  etudiantId    String
-  etudiant      User        @relation("EtudiantSessions", fields: [etudiantId], references: [id])
+  encadreurId String
+  encadreur   User   @relation("EncadreurSessions", fields: [encadreurId], references: [id])
+  etudiantId  String
+  etudiant    User   @relation("EtudiantSessions", fields: [etudiantId], references: [id])
+
+  @@unique([encadreurId, numero])
 }
 
 model SessionRequest {
-  id          String      @id @default(uuid())
-  date        DateTime
-  heure       String      // "HH:mm"
-  type        SessionType
-  statut      String      @default("EN_ATTENTE") // EN_ATTENTE, ACCEPTEE, REFUSEE
+  id     String      @id @default(uuid())
+  date   DateTime
+  heure  String // "HH:mm"
+  type   SessionType
+  statut String      @default("EN_ATTENTE") // EN_ATTENTE, ACCEPTEE, REFUSEE
 
   etudiantId  String
   encadreurId String
 
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  etudiant    User @relation("SessionRequestEtudiant", fields: [etudiantId], references: [id])
-  encadreur   User @relation("SessionRequestEncadreur", fields: [encadreurId], references: [id])
+  etudiant  User @relation("SessionRequestEtudiant", fields: [etudiantId], references: [id])
+  encadreur User @relation("SessionRequestEncadreur", fields: [encadreurId], references: [id])
 }
 
 model Document {
@@ -182,28 +184,28 @@ model Document {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  memoireId   String
-  memoire     Memoire  @relation(fields: [memoireId], references: [id])
+  memoireId String
+  memoire   Memoire @relation(fields: [memoireId], references: [id])
 }
 
 model Jury {
-  id              String    @id @default(uuid())
-  nom             String
-  dateSoutenance  DateTime
-  salle           String
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  statut          JuryStatus @default(PLANIFIE) // PLANIFIE, TERMINE, ANNULE
+  id             String     @id @default(uuid())
+  nom            String
+  dateSoutenance DateTime
+  salle          String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  statut         JuryStatus @default(PLANIFIE) // PLANIFIE, TERMINE, ANNULE
 
   // Relations
-  memoireId       String    @unique
-  memoire         Memoire   @relation(fields: [memoireId], references: [id])
+  memoireId        String  @unique
+  memoire          Memoire @relation(fields: [memoireId], references: [id])
   encadreurJury1Id String
-  encadreurJury1   User      @relation("JuryEncadreur1", fields: [encadreurJury1Id], references: [id])
+  encadreurJury1   User    @relation("JuryEncadreur1", fields: [encadreurJury1Id], references: [id])
   encadreurJury2Id String
-  encadreurJury2   User      @relation("JuryEncadreur2", fields: [encadreurJury2Id], references: [id])
+  encadreurJury2   User    @relation("JuryEncadreur2", fields: [encadreurJury2Id], references: [id])
   encadreurJury3Id String
-  encadreurJury3   User      @relation("JuryEncadreur3", fields: [encadreurJury3Id], references: [id])
+  encadreurJury3   User    @relation("JuryEncadreur3", fields: [encadreurJury3Id], references: [id])
 }
 
 enum PaymentMethod {
@@ -214,16 +216,16 @@ enum PaymentMethod {
 }
 
 model Paiement {
-  id         String   @id @default(cuid())
+  id         String        @id @default(cuid())
   montant    Float
   reference  String
   date       DateTime
-  status     String   @default("EN_ATTENTE") // EN_ATTENTE, VALIDE, REJETE
+  status     String        @default("EN_ATTENTE") // EN_ATTENTE, VALIDE, REJETE
   methode    PaymentMethod @default(ESPECE)
   etudiantId String
-  etudiant   User     @relation(fields: [etudiantId], references: [id])
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  etudiant   User          @relation(fields: [etudiantId], references: [id])
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
 }
 
 model Notification {
@@ -238,12 +240,12 @@ model Notification {
 }
 
 model HistoriqueMemoireStatus {
-  id          String    @id @default(uuid())
+  id          String   @id @default(uuid())
   status      String
   commentaire String?
-  createdAt   DateTime  @default(now())
-  
+  createdAt   DateTime @default(now())
+
   // Relations
-  memoireId   String
-  memoire     Memoire   @relation(fields: [memoireId], references: [id])
+  memoireId String
+  memoire   Memoire @relation(fields: [memoireId], references: [id])
 }

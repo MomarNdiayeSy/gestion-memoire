@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { dashboardApi } from '@/services/api';
+import { dashboardApi, userApi } from '@/services/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, BookOpen, GraduationCap, CreditCard, Clock, AlertCircle } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
@@ -23,15 +23,27 @@ const AdminDashboard = () => {
     queryFn: dashboardApi.getStats,
   });
 
+  // Fetch list of all users to compute count
+  const { data: usersData } = useQuery<any[]>({
+    queryKey: ['users-all'],
+    queryFn: () => userApi.getAll(),
+  });
+
   const stats = React.useMemo(() => {
-    if (!statsData) return fallbackStats;
+    const usersCount = Array.isArray(usersData)
+      ? usersData.length
+      : (usersData as any)?.users?.length ?? statsData?.users ?? 0;
+    const memoiresCount = statsData?.memoires ?? 0;
+    const jurysCount = statsData?.jurys ?? 0;
+    const montantTotal = statsData?.montant ?? 0;
+
     return [
-      { title: 'Utilisateurs', value: statsData.users.toString(), description: 'utilisateurs', icon: Users, color: 'from-blue-600 to-blue-700', change: '' },
-      { title: 'Mémoires', value: statsData.memoires.toString(), description: 'mémoires', icon: BookOpen, color: 'from-green-600 to-green-700', change: '' },
-      { title: 'Jurys', value: statsData.jurys.toString(), description: 'jurys', icon: GraduationCap, color: 'from-purple-600 to-purple-700', change: '' },
-      { title: 'Paiements', value: statsData.montant.toLocaleString('fr-FR').replace(/\s/g, '.'), description: 'FCFA collectés', icon: CreditCard, color: 'from-orange-600 to-orange-700', change: '' },
+      { title: 'Utilisateurs', value: usersCount.toString(), description: 'utilisateurs', icon: Users, color: 'from-blue-600 to-blue-700', change: '' },
+      { title: 'Mémoires', value: memoiresCount.toString(), description: 'mémoires', icon: BookOpen, color: 'from-green-600 to-green-700', change: '' },
+      { title: 'Jurys', value: jurysCount.toString(), description: 'jurys', icon: GraduationCap, color: 'from-purple-600 to-purple-700', change: '' },
+      { title: 'Paiements', value: montantTotal.toLocaleString('fr-FR').replace(/\s/g, '.'), description: 'FCFA collectés', icon: CreditCard, color: 'from-orange-600 to-orange-700', change: '' },
     ];
-  }, [statsData]);
+  }, [statsData, usersData]);
 
   // Activities
   type Activity = { type: string; message: string; details: string; createdAt?: string; time?: string };

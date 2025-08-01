@@ -9,6 +9,7 @@ import {
   validateFinalByAdmin,
   updateMemoireStatus,
   updateMemoire,
+  updateMemoireEvaluation,
   addDocument,
   updateDocumentComment
 } from '../controllers/memoireController';
@@ -36,6 +37,10 @@ router.patch('/:id/status', updateMemoireStatus);
 
 // Mettre à jour un mémoire (ETUDIANT propriétaire uniquement)
 router.put('/:id', checkRole(['ADMIN', 'ETUDIANT', 'ENCADREUR']), updateMemoire);
+
+// Mettre à jour la note / mention après soutenance (ADMIN)
+router.patch('/:id/evaluation', checkRole(['ADMIN']), updateMemoireEvaluation);
+
 
 // Ajouter un document au mémoire (ETUDIANT propriétaire uniquement)
 import { upload } from '../middleware/uploadMiddleware';

@@ -9,8 +9,6 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   FileText,
   Search,
-  Download,
-  Eye,
   Filter,
   CheckCircle,
   Clock,
@@ -18,25 +16,18 @@ import {
   Edit,
   Award,
   Pencil,
+  Upload,
 } from 'lucide-react';
-import { memoireApi } from '@/services/api';
+import { memoireApi, libraryApi } from '@/services/api';
 import { toast } from 'sonner';
-
-interface Document {
-  id: string;
-  nom: string;
-  url: string;
-  type: string;
-  createdAt: Date;
-}
 
 interface Memoire {
   id: string;
   titre: string;
   description: string;
-  status: 'EN_COURS' | 'SOUMIS' | 'EN_REVISION' | 'VALIDE' | 'REJETE' | 'SOUTENU';
+  status: 'EN_COURS' | 'SOUMIS' | 'EN_REVISION' | 'VALIDE' | 'VALIDE_ADMIN' | 'REJETE' | 'SOUTENU';
+  published: boolean;
   motsCles: string[];
-  documents: Document[];
   dateDepot?: Date;
   dateSoutenance?: Date;
   etudiant: { id: string; nom: string; prenom: string };
@@ -87,6 +78,7 @@ const MemoireManagement = () => {
       SOUMIS: 'bg-yellow-100 text-yellow-800',
       EN_REVISION: 'bg-orange-100 text-orange-800',
       VALIDE: 'bg-green-100 text-green-800',
+    VALIDE_ADMIN: 'bg-indigo-100 text-indigo-800',
       REJETE: 'bg-red-100 text-red-800',
       SOUTENU: 'bg-purple-100 text-purple-800',
     } as const;
@@ -102,6 +94,7 @@ const MemoireManagement = () => {
       case 'EN_REVISION':
         return <Edit className="h-4 w-4" />;
       case 'VALIDE':
+      case 'VALIDE_ADMIN':
         return <CheckCircle className="h-4 w-4" />;
       case 'REJETE':
         return <XCircle className="h-4 w-4" />;
@@ -115,6 +108,16 @@ const MemoireManagement = () => {
   const getStatusCount = (status: Memoire['status']) => memoires.filter((m) => m.status === status).length;
 
   /* ----------------------- Mutations handlers ----------------------- */
+  const handlePublish = async (id: string) => {
+    try {
+      await libraryApi.publish(id);
+      toast.success('Mémoire publié dans la bibliothèque');
+      loadMemoires();
+    } catch (err) {
+      console.error(err);
+      toast.error('Erreur lors de la publication');
+    }
+  };
   const handleStatusUpdate = async (id: string, newStatus: Memoire['status']) => {
     try {
       await memoireApi.updateStatus(id, { status: newStatus });
@@ -169,7 +172,7 @@ const MemoireManagement = () => {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -185,21 +188,10 @@ const MemoireManagement = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">En cours</p>
-                  <p className="text-2xl font-bold text-blue-600">{getStatusCount('EN_COURS')}</p>
+                  <p className="text-sm font-medium text-gray-600">Soutenus</p>
+                  <p className="text-2xl font-bold text-purple-600">{getStatusCount('SOUTENU')}</p>
                 </div>
-                <Clock className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Déposés</p>
-                  <p className="text-2xl font-bold text-yellow-600">{getStatusCount('SOUMIS')}</p>
-                </div>
-                <FileText className="h-8 w-8 text-yellow-600" />
+                <Award className="h-8 w-8 text-purple-600" />
               </div>
             </CardContent>
           </Card>
@@ -309,32 +301,6 @@ const MemoireManagement = () => {
                       </div>
                     </div>
 
-                    {/* Documents */}
-                    {m.documents.length > 0 && (
-                      <div className="mt-4">
-                        <h5 className="text-sm font-medium text-gray-700 mb-2">Documents</h5>
-                        <div className="space-y-2">
-                          {m.documents.map((doc) => (
-                            <div key={doc.id} className="flex items-center justify-between text-sm">
-                              <span className="text-gray-600">{doc.nom}</span>
-                              <div className="flex items-center space-x-2">
-                                <Button size="sm" variant="outline" asChild>
-                                  <a href={doc.url} target="_blank" rel="noopener noreferrer">
-                                    <Eye className="h-4 w-4 mr-1" /> Voir
-                                  </a>
-                                </Button>
-                                <Button size="sm" variant="outline" asChild>
-                                  <a href={doc.url} download>
-                                    <Download className="h-4 w-4 mr-1" /> Télécharger
-                                  </a>
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
                     {/* Actions */}
                     <div className="mt-4 flex space-x-2 flex-wrap">
                       <Button
@@ -354,6 +320,7 @@ const MemoireManagement = () => {
                       >
                         <Pencil className="h-4 w-4 mr-1" /> Éditer
                       </Button>
+                      {/* Actions selon status */}
                       {m.status === 'SOUMIS' && (
                         <>
                           <Button
@@ -379,7 +346,29 @@ const MemoireManagement = () => {
                           >
                             <XCircle className="mr-1 h-4 w-4" /> Refuser
                           </Button>
-                        </>
+                        </>)}
+
+                      {/* Bouton Publier */}
+                      {/* Bouton Marquer comme soutenu */}
+                      {m.status === 'VALIDE_ADMIN' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleStatusUpdate(m.id, 'SOUTENU')}
+                        >
+                          <Award className="mr-1 h-4 w-4" /> Marquer soutenu
+                        </Button>
+                      )}
+
+                      {/* Bouton Publier */}
+                      {m.status === 'SOUTENU' && !m.published && (
+                        <Button
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={() => handlePublish(m.id)}
+                        >
+                          <Upload className="mr-1 h-4 w-4" /> Publier
+                        </Button>
                       )}
                     </div>
                   </div>

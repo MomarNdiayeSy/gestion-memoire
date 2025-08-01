@@ -10,6 +10,7 @@ import sessionRoutes from './routes/sessionRoutes';
 import juryRoutes from './routes/juryRoutes';
 import paiementRoutes from './routes/paiementRoutes';
 import notificationRoutes from './routes/notificationRoutes';
+import bibliothequeRoutes from './routes/bibliothequeRoutes';
 import sessionRequestRoutes from './routes/sessionRequestRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 
@@ -42,6 +43,7 @@ app.use('/api/jurys', juryRoutes);
 app.use('/api/paiements', paiementRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/bibliotheque', bibliothequeRoutes);
 app.use('/api/session-requests', sessionRequestRoutes);
 
 // Expose dossier uploads statique

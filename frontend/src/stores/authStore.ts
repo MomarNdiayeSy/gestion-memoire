@@ -55,13 +55,21 @@ const useAuthStore = create<AuthState>((set) => ({
   },
 
   checkAuth: async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      // Pas de token : on considère l'utilisateur comme non authentifié
+      set({ user: null, token: null, isAuthenticated: false });
+      return;
+    }
     try {
       const response = await api.get('/auth/me');
       const received = response.data;
       const currentUser = received.user ?? received;
-      set({ user: currentUser, isAuthenticated: true });
+      // On conserve le token existant
+      set({ user: currentUser, token, isAuthenticated: true });
     } catch (error) {
       console.error('Check auth error:', error);
+      // Token invalide : on le supprime et on réinitialise le store
       localStorage.removeItem('token');
       set({ user: null, token: null, isAuthenticated: false });
     }

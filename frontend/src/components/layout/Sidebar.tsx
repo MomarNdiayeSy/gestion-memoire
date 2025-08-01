@@ -31,6 +31,7 @@ const Sidebar = () => {
   const location = useLocation();
 
   const adminMenuItems = [
+    { icon: BookOpen, label: 'Bibliothèque', path: '/library' },
     { icon: BarChart, label: 'Tableau de bord', path: '/admin/dashboard' },
     { icon: Users, label: 'Utilisateurs', path: '/admin/users' },
     { icon: BookMarked, label: 'Sujets', path: '/admin/subjects' },
@@ -42,6 +43,7 @@ const Sidebar = () => {
   ];
 
   const encadreurMenuItems = [
+    { icon: BookOpen, label: 'Bibliothèque', path: '/library' },
     { icon: BarChart, label: 'Tableau de bord', path: '/encadreur/dashboard' },
     { icon: Users, label: 'Mes étudiants', path: '/encadreur/students' },
     { icon: BookMarked, label: 'Mes sujets', path: '/encadreur/subjects' },
@@ -50,6 +52,7 @@ const Sidebar = () => {
   ];
 
   const etudiantMenuItems = [
+    { icon: BookOpen, label: 'Bibliothèque', path: '/library' },
     { icon: BarChart, label: 'Tableau de bord', path: '/etudiant/dashboard' },
     { icon: BookMarked, label: 'Choix du sujet', path: '/etudiant/subjects' },
     { icon: BookOpen, label: 'Mon mémoire', path: '/etudiant/memoire' },

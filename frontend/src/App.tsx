@@ -32,6 +32,7 @@ import SubjectSelection from './pages/etudiant/SubjectSelection';
 import MyMemoir from './pages/etudiant/MyMemoir';
 import MentoringSessions from './pages/etudiant/MentoringSessions';
 import Payment from './pages/etudiant/Payment';
+import Library from './pages/Library';
 
 function App() {
   const { user, checkAuth } = useAuth();
@@ -61,6 +62,16 @@ function App() {
         {/* Redirection de la racine vers le tableau de bord approprié */}
         <Route path="/" element={<Navigate to={getDefaultRoute()} replace />} />
         
+        {/* Bibliothèque accessible à tous rôles */}
+        <Route
+          path="/library"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'ENCADREUR', 'ETUDIANT']}>
+              <Library />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Routes publiques */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

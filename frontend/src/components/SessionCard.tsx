@@ -14,8 +14,9 @@ interface Props {
 }
 
 const SessionCard: React.FC<Props> = ({ session, role, onJoin, onVisa }) => {
+  const cancelled = session.statut === 'ANNULEE';
   const canJoin = session.type === 'VIRTUEL' && session.meetingLink && !['TERMINE', 'EFFECTUEE', 'ANNULEE'].includes(session.statut);
-  const showVisaBtn = role === 'ETUDIANT' ? !session.visaEtudiant : !session.visaEncadreur;
+  const showVisaBtn = !cancelled && (role === 'ETUDIANT' ? !session.visaEtudiant : !session.visaEncadreur);
 
   return (
     <Card className="border-0 shadow-lg">
@@ -35,7 +36,7 @@ const SessionCard: React.FC<Props> = ({ session, role, onJoin, onVisa }) => {
                 Rejoindre
               </DropdownMenuItem>
             )}
-            {showVisaBtn && onVisa && session.statut !== 'ANNULEE' && (
+            {showVisaBtn && onVisa && (
               <DropdownMenuItem onClick={() => onVisa(session.id)}>
                 Signer le visa
               </DropdownMenuItem>
@@ -76,7 +77,7 @@ const SessionCard: React.FC<Props> = ({ session, role, onJoin, onVisa }) => {
                 <CheckCircle className="mr-1 h-4 w-4" /> Signer le visa
               </Button>
             )}
-            {role === 'ETUDIANT' && (
+            {role === 'ETUDIANT' && !cancelled && (
               <>
                 {session.visaEtudiant && (
                   <Button disabled className="w-full bg-green-600 cursor-default mt-2">

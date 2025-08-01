@@ -127,7 +127,7 @@ export const memoireApi = {
   },
 
   // Obtenir tous les mémoires avec filtre optionnel
-  getAll: async (filters?: { status?: 'EN_COURS' | 'SOUMIS' | 'EN_REVISION' | 'VALIDE' | 'REJETE' | 'SOUTENU' }) => {
+  getAll: async (filters?: { status?: 'EN_COURS' | 'SOUMIS' | 'EN_REVISION' | 'VALIDE' | 'VALIDE_ADMIN' | 'REJETE' | 'SOUTENU' }) => {
     const params = new URLSearchParams(filters);
     const response = await api.get(`/memoires?${params}`);
     return response.data;
@@ -152,6 +152,12 @@ export const memoireApi = {
     }
   },
 
+  // Mettre à jour la note / mention après soutenance (admin)
+  updateEvaluation: async (id: string, data: { note?: number; mention?: string }) => {
+    const response = await api.patch(`/memoires/${id}/evaluation`, data);
+    return response.data;
+  },
+
   // Mettre à jour un mémoire
   update: async (id: string, data: {
     titre?: string;
@@ -159,7 +165,7 @@ export const memoireApi = {
     motsCles?: string[];
     dateDepot?: string;
     dateSoutenance?: string;
-    status?: 'EN_COURS' | 'SOUMIS' | 'EN_REVISION' | 'VALIDE' | 'REJETE' | 'SOUTENU';
+    status?: 'EN_COURS' | 'SOUMIS' | 'EN_REVISION' | 'VALIDE' | 'VALIDE_ADMIN' | 'REJETE' | 'SOUTENU';
     progression?: number;
   }) => {
     const response = await api.put(`/memoires/${id}`, data);
@@ -168,7 +174,7 @@ export const memoireApi = {
 
   // Mettre à jour le statut d'un mémoire
   updateStatus: async (id: string, data: {
-    status: 'EN_COURS' | 'SOUMIS' | 'EN_REVISION' | 'VALIDE' | 'REJETE' | 'SOUTENU';
+    status: 'EN_COURS' | 'SOUMIS' | 'EN_REVISION' | 'VALIDE' | 'VALIDE_ADMIN' | 'REJETE' | 'SOUTENU';
     commentaire?: string;
   }) => {
     const response = await api.patch(`/memoires/${id}/status`, data);
@@ -215,6 +221,23 @@ export const memoireApi = {
     const response = await api.patch(`/memoires/documents/${docId}/comment`, data);
     return response.data;
   }
+};
+
+// ----------- Bibliothèque API -----------
+export const libraryApi = {
+  // Lister les mémoires publiés (bibliothèque)
+  list: async (filters?: { search?: string; year?: string; encadreurId?: string }) => {
+    const params = filters ? new URLSearchParams(filters as Record<string, string>) : new URLSearchParams();
+    const query = params.toString();
+    const response = await api.get(`/bibliotheque${query ? `?${query}` : ''}`);
+    return response.data;
+  },
+
+  // Publier un mémoire (admin)
+  publish: async (id: string) => {
+    const response = await api.patch(`/bibliotheque/memoires/${id}/publish`);
+    return response.data;
+  },
 };
 
 export const userApi = {

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { memoireApi } from '@/services/api';
+import { memoireApi, sessionApi } from '@/services/api';
 import { useAuth } from '@/stores/authStore';
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -64,8 +64,10 @@ const MyMemoir = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [isFinalDialogOpen, setIsFinalDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  // Memoire de l'étudiant
   const { data: memoire, isFetching } = useQuery<any | null>({
     queryKey: ['my-memoire'],
     queryFn: () => memoireApi.getMy(),
@@ -98,6 +100,16 @@ const MyMemoir = () => {
         return 0;
     }
   };
+
+  // Sessions de mentoring de l'étudiant
+  const { data: sessions = [] } = useQuery<any[]>({
+    queryKey: ['my-sessions'],
+    queryFn: () => sessionApi.getAll(),
+  });
+
+  const sessionsCount = sessions.filter((s: any) => s.etudiantId === user?.id).length;
+  const alreadyFinal = Boolean((memoire as any)?.fichierFinalUrl) || ['SOUMIS_FINAL', 'VALIDE', 'VALIDE_ENCADREUR', 'VALIDE_ADMIN'].includes((memoire as any)?.status ?? '');
+  const canDepositFinal = memoire && !alreadyFinal && sessionsCount >= 10;
 
   const finalMutation = useMutation({
     mutationFn: async (payload: { file: File; description: string }) => {
@@ -262,6 +274,89 @@ const MyMemoir = () => {
               </form>
             </DialogContent>
           </Dialog>
+
+            {/* Bouton Déposer fichier final – visible seulement si un mémoire existe */}
+            {/* Bouton Déposer fichier final */}
+            {memoire && canDepositFinal && (
+              <Dialog open={isFinalDialogOpen} onOpenChange={setIsFinalDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="border-green-600 text-green-600 hover:bg-green-50"
+                    onClick={(e) => {
+                      if (alreadyFinal) {
+                        e.preventDefault();
+                        toast({ variant: 'destructive', title: 'Dépôt impossible', description: 'Le fichier final a déjà été déposé.' });
+                        return;
+                      }
+                      if (sessionsCount < 10) {
+                        e.preventDefault();
+                        toast({ variant: 'destructive', title: 'Dépôt impossible', description: 'Vous devez effectuer au moins 10 séances avant de déposer votre fichier final.' });
+                        return;
+                      }
+                    }}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Déposer le fichier final
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Déposer votre fichier final</DialogTitle>
+                    <DialogDescription>
+                      Téléchargez la version finale de votre mémoire pour validation.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!selectedFile) return;
+                      finalMutation.mutate({ file: selectedFile, description: (e.currentTarget as any).description.value });
+                    }}
+                    className="space-y-4"
+                  >
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium" htmlFor="description">
+                        Description
+                      </label>
+                      <Textarea id="description" name="description" placeholder="Ex: Version finale validée par l'encadreur" required />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium" htmlFor="file-final">
+                        Fichier
+                      </label>
+                      <Input id="file-final" name="file-final" type="file" accept=".pdf,.doc,.docx" onChange={handleFileUpload} required />
+                    </div>
+                    <div className="flex justify-end space-x-2">
+                      <Button type="button" variant="outline" onClick={() => { setIsFinalDialogOpen(false); setSelectedFile(null); }}>
+                        Annuler
+                      </Button>
+                      <Button type="submit" disabled={!selectedFile} className="bg-green-600 hover:bg-green-700 text-white">
+                        Déposer
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+
+            {/* Cas non éligible : bouton simple qui affiche un toast */}
+            {memoire && !canDepositFinal && (
+              <Button
+                variant="outline"
+                className="border-gray-400 text-gray-600 hover:bg-gray-50"
+                onClick={() => {
+                  if (alreadyFinal) {
+                    toast({ variant: 'destructive', title: 'Dépôt impossible', description: 'Le fichier final a déjà été déposé.' });
+                  } else if (sessionsCount < 10) {
+                    toast({ variant: 'destructive', title: 'Dépôt impossible', description: 'Vous devez effectuer au moins 10 séances avant de déposer votre fichier final.' });
+                  }
+                }}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Déposer le fichier final
+              </Button>
+            )}
         </div>
 
         {/* Stats Cards */}

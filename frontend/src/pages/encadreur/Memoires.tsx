@@ -133,7 +133,7 @@ const Memoires = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -142,36 +142,6 @@ const Memoires = () => {
                   <p className="text-2xl font-bold text-gray-900">{memoires.length}</p>
                 </div>
                 <FileText className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">En cours</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {memoires.filter(m => m.status === 'EN_COURS').length}
-                  </p>
-                </div>
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Clock className="h-4 w-4 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Déposés</p>
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {memoires.filter(m => m.status === 'SOUMIS').length}
-                  </p>
-                </div>
-                <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                  <FileText className="h-4 w-4 text-yellow-600" />
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -247,28 +217,10 @@ const Memoires = () => {
                   Tous
                 </Button>
                 <Button
-                  variant={filterStatus === 'EN_COURS' ? 'default' : 'outline'}
-                  onClick={() => setFilterStatus('EN_COURS')}
-                >
-                  En cours
-                </Button>
-                <Button
-                  variant={filterStatus === 'SOUMIS' ? 'default' : 'outline'}
-                  onClick={() => setFilterStatus('SOUMIS')}
-                >
-                  Déposés
-                </Button>
-                <Button
                   variant={filterStatus === 'VALIDE' ? 'default' : 'outline'}
                   onClick={() => setFilterStatus('VALIDE')}
                 >
                   Validés
-                </Button>
-                <Button
-                  variant={filterStatus === 'EN_REVISION' ? 'default' : 'outline'}
-                  onClick={() => setFilterStatus('EN_REVISION')}
-                >
-                  En révision
                 </Button>
                 <Button
                   variant={filterStatus === 'REJETE' ? 'default' : 'outline'}
@@ -282,7 +234,6 @@ const Memoires = () => {
                 >
                   Soutenus
                 </Button>
-
               </div>
             </div>
           </CardContent>
@@ -451,6 +402,5 @@ const Memoires = () => {
     </DashboardLayout>
   );
 };
-
 
 export default Memoires;

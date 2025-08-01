@@ -244,6 +244,14 @@ export const updateMemoireStatus = async (req: Request, res: Response) => {
       }
     });
 
+    // Si le mémoire est soutenu, marquer le jury comme terminé
+    if (status === 'SOUTENU') {
+      await prisma.jury.updateMany({
+        where: { memoireId: id, statut: 'PLANIFIE' },
+        data: { statut: 'TERMINE' }
+      });
+    }
+
     // Créer l'historique
     await prisma.historiqueMemoireStatus.create({
       data: {
@@ -310,6 +318,14 @@ export const updateMemoire = async (req: Request, res: Response) => {
       where: { id },
       data: payload
     });
+
+    // Si le statut vient de passer à SOUTENU, terminer le jury associé
+    if (payload.status === 'SOUTENU') {
+      await prisma.jury.updateMany({
+        where: { memoireId: id, statut: 'PLANIFIE' },
+        data: { statut: 'TERMINE' }
+      });
+    }
 
     res.json(updatedMemoire);
   } catch (error) {
@@ -442,6 +458,56 @@ export const updateDocumentComment = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Erreur lors de la mise à jour du commentaire" });
   }
 
+};
+
+// --------------------------------------
+// ADMIN : mettre à jour la note et la mention après soutenance
+// PATCH /memoires/:id/evaluation { note: number, mention: string }
+export const updateMemoireEvaluation = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params as { id: string };
+    const { note, mention } = req.body as { note: number; mention: string };
+
+    // Validation simple
+    const allowedMentions = ['Passable', 'Assez Bien', 'Bien', 'Très Bien', 'Excellent / Félicitations du jury'];
+    if (typeof note !== 'number' || note < 0 || note > 20) {
+      return res.status(400).json({ message: 'Note invalide (0-20)' });
+    }
+    if (!allowedMentions.includes(mention)) {
+      return res.status(400).json({ message: 'Mention invalide' });
+    }
+
+    // Récupérer le mémoire avec relations
+    const memoire = await prisma.memoire.findUnique({
+      where: { id },
+      include: { etudiant: true }
+    });
+    if (!memoire) return res.status(404).json({ message: 'Mémoire non trouvé' });
+
+    // Mettre à jour note / mention
+    const updated = await prisma.memoire.update({ where: { id }, data: { note, mention } });
+
+    // Notifications à l'étudiant et à l'encadreur
+    const notificationsData = [
+      {
+        titre: 'Résultat de soutenance',
+        message: `Votre mémoire a été noté ${note}/20 – Mention : ${mention}.`,
+        userId: memoire.etudiantId ?? undefined,
+      },
+      {
+        titre: 'Résultat de soutenance',
+        message: `Le mémoire de votre étudiant ${memoire.etudiant?.prenom} ${memoire.etudiant?.nom} a été noté ${note}/20 – Mention : ${mention}.`,
+        userId: memoire.encadreurId ?? undefined,
+      },
+    ].filter((n) => n.userId);
+
+    await prisma.notification.createMany({ data: notificationsData as any });
+
+    res.json(updated);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur lors de la mise à jour de l'évaluation" });
+  }
 };
 
 export const addDocument = async (req: Request, res: Response) => {
