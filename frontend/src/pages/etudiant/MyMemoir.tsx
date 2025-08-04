@@ -108,7 +108,7 @@ const MyMemoir = () => {
   });
 
   const sessionsCount = sessions.filter((s: any) => s.etudiantId === user?.id).length;
-  const alreadyFinal = Boolean((memoire as any)?.fichierFinalUrl) || ['SOUMIS_FINAL', 'VALIDE', 'VALIDE_ENCADREUR', 'VALIDE_ADMIN'].includes((memoire as any)?.status ?? '');
+  const alreadyFinal = Boolean((memoire as any)?.fichierFinalUrl) || ['SOUMIS_FINAL', 'VALIDE_ENCADREUR', 'VALIDE_ADMIN'].includes((memoire as any)?.status ?? '');
   const canDepositFinal = memoire && !alreadyFinal && sessionsCount >= 10;
 
   const finalMutation = useMutation({

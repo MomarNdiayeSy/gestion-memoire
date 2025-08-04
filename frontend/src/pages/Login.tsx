@@ -1,14 +1,11 @@
 import React from 'react';
 import { useAuth } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff, BookOpen } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '../components/ui/use-toast';
 
 const Login = () => {
@@ -23,19 +20,19 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     try {
       const user = await login(email, password);
       toast({
         title: 'Connexion réussie',
         description: 'Vous êtes maintenant connecté',
       });
-      
+
       // Redirection basée sur le rôle
-      const dashboardRoutes = {
+      const dashboardRoutes: Record<string, string> = {
         ADMIN: '/admin/dashboard',
         ENCADREUR: '/encadreur/dashboard',
-        ETUDIANT: '/etudiant/dashboard'
+        ETUDIANT: '/etudiant/dashboard',
       };
       navigate(dashboardRoutes[user.role]);
     } catch (err: any) {
@@ -46,16 +43,21 @@ const Login = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-violet-50 to-purple-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        
+        {/* Logo et titre */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <div className="bg-gradient-to-r from-blue-600 to-violet-600 p-3 rounded-full">
-              <BookOpen className="h-8 w-8 text-white" />
-            </div>
+            <img
+              src="/logo-isi.jpg"
+              alt="Logo ISI"
+              className="h-16 w-16 object-contain rounded-full border border-gray-200 shadow-sm"
+            />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Plateforme ISI</h1>
           <p className="text-gray-600">Gestion des Mémoires Académiques</p>
         </div>
 
+        {/* Carte de connexion */}
         <Card className="shadow-xl border-0 backdrop-blur-sm bg-white/80">
           <CardHeader className="space-y-1 pb-6">
             <CardTitle className="text-2xl font-semibold text-center text-gray-800">
@@ -68,6 +70,8 @@ const Login = () => {
           
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
+              
+              {/* Email */}
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium text-gray-700">
                   Adresse email
@@ -83,6 +87,7 @@ const Login = () => {
                 />
               </div>
 
+              {/* Mot de passe */}
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-sm font-medium text-gray-700">
                   Mot de passe
@@ -107,8 +112,10 @@ const Login = () => {
                 </div>
               </div>
 
+              {/* Message d'erreur */}
               {error && <p className="text-red-500 text-sm">{error}</p>}
 
+              {/* Bouton Connexion */}
               <Button
                 type="submit"
                 className="w-full h-11 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-[1.02]"
@@ -116,6 +123,7 @@ const Login = () => {
                 Se connecter
               </Button>
 
+              {/* Lien mot de passe oublié */}
               <div className="text-center">
                 <button
                   type="button"
@@ -124,13 +132,28 @@ const Login = () => {
                   Mot de passe oublié ?
                 </button>
               </div>
+
+              {/* Lien vers inscription */}
+              <div className="text-center mt-2">
+                <span className="text-sm text-gray-600">
+                  Pas de compte ?{' '}
+                  <button
+                    type="button"
+                    onClick={() => navigate('/register')} // Redirection vers la page d'inscription
+                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    S'inscrire
+                  </button>
+                </span>
+              </div>
             </form>
           </CardContent>
         </Card>
 
+        {/* Footer */}
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-500">
-            Plateforme de Gestion des Mémoires - ISI © 2024
+            Plateforme de Gestion des Mémoires - ISI © 2025
           </p>
         </div>
       </div>

@@ -4,6 +4,10 @@
 
 **URL**: https://lovable.dev/projects/d6894e5c-67cd-410f-866c-924dd053adea
 
+  ## How can I edit this code?
+
+Edit this code using Lovable, your preferred IDE, directly in GitHub, or using GitHub Codespaces.
+
 ## How can I edit this code?
 
 There are several ways of editing your application.

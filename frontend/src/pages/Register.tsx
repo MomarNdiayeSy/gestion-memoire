@@ -54,11 +54,15 @@ const Register = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-violet-50 to-purple-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        {/* Logo et titre */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <div className="bg-gradient-to-r from-blue-600 to-violet-600 p-3 rounded-full">
-              <BookOpen className="h-8 w-8 text-white" />
-            </div>
+            {/* Logo ISI */}
+            <img
+              src="/logo-isi.jpg"
+              alt="Logo ISI"
+              className="h-16 w-16 object-contain rounded-full border border-gray-200 shadow-sm"
+            />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Plateforme ISI</h1>
           <p className="text-gray-600">Gestion des Mémoires Académiques</p>
@@ -212,7 +216,7 @@ const Register = () => {
 
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-500">
-            Plateforme de Gestion des Mémoires - ISI © 2024
+            Plateforme de Gestion des Mémoires - ISI © 2025
           </p>
         </div>
       </div>
