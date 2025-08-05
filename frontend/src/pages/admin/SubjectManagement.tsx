@@ -39,6 +39,8 @@ const SubjectManagement = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [subjects, setSubjects] = useState<Sujet[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 2;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<{ titre: string; description: string; motsCles: string; encadreurId: string }>({ titre: '', description: '', motsCles: '', encadreurId: '' });
   const [createData, setCreateData] = useState<{ titre: string; description: string; motsCles: string; encadreurId: string }>({ titre: '', description: '', motsCles: '', encadreurId: '' });
@@ -158,6 +160,12 @@ const SubjectManagement = () => {
     const matchesStatus = filterStatus === 'all' || subject.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
+
+  const totalPages = Math.ceil(filteredSubjects.length / ITEMS_PER_PAGE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, filterStatus]);
 
   const getStatusCount = (status: string) => {
     return subjects.filter(s => s.status === status).length;
@@ -290,7 +298,7 @@ const SubjectManagement = () => {
           {loading ? (
             <p>Chargement des sujets...</p>
           ) : (
-            filteredSubjects.map((subject) => (
+            filteredSubjects.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).map((subject) => (
               <Card key={subject.id} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
                 <CardHeader className="pb-4">
                   <div className="flex items-start justify-between">
@@ -366,6 +374,18 @@ const SubjectManagement = () => {
             ))
           )}
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-4">
+            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>
+              Précédent
+            </Button>
+            <span className="text-sm">{page} / {totalPages}</span>
+            <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage(page + 1)}>
+              Suivant
+            </Button>
+          </div>
+        )}
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

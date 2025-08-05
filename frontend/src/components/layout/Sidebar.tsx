@@ -86,16 +86,7 @@ const Sidebar = () => {
 
   return (
     <aside className="bg-white w-64 min-h-screen shadow-lg border-r border-gray-200">
-      <div className="p-6 border-b border-gray-200">
-        <h2 className="text-2xl font-bold text-gray-800">
-          {user?.role === 'ADMIN' ? 'Administration' :
-           user?.role === 'ENCADREUR' ? 'Espace Encadreur' :
-           'Espace Étudiant'}
-        </h2>
-        <p className="text-sm text-gray-600 mt-1">
-          {user?.prenom} {user?.nom}
-        </p>
-      </div>
+    
       <nav className="p-4">
         <ul className="space-y-2">
           {menuItems.map((item) => {

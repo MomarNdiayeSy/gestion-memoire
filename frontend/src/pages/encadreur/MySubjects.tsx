@@ -127,6 +127,10 @@ const MySubjects = () => {
   };
 
   // Filtrage
+  // Pagination state
+  const [page, setPage] = React.useState(1);
+  const perPage = 2;
+
   const filteredSujets = sujets.filter(sujet => {
     const matchesSearch =
       sujet.titre.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -135,6 +139,13 @@ const MySubjects = () => {
     const matchesStatus = filterStatus === 'all' || sujet.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
+
+    // Reset page when filters change
+  React.useEffect(() => {
+    setPage(1);
+  }, [searchTerm, filterStatus, sujets]);
+
+  const paginatedSujets = filteredSujets.slice((page - 1) * perPage, page * perPage);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -316,7 +327,7 @@ const MySubjects = () => {
 
         {/* Sujets List */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredSujets.map((sujet) => (
+          {paginatedSujets.map((sujet) => (
             <Card key={sujet.id} className="border-0 shadow-lg">
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -382,13 +393,21 @@ const MySubjects = () => {
             </Card>
           ))}
 
-          {filteredSujets.length === 0 && (
+          {paginatedSujets.length === 0 && (
             <div className="col-span-full text-center py-8 text-gray-500">
               <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
               <p>Aucun sujet trouvé</p>
             </div>
           )}
-        </div>
+        {/* Pagination controls */}
+        {filteredSujets.length > perPage && (
+          <div className="flex justify-center mt-6 space-x-4">
+            <Button variant="outline" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Précédent</Button>
+            <span className="text-sm self-center text-gray-600">Page {page} / {Math.ceil(filteredSujets.length / perPage)}</span>
+            <Button variant="outline" disabled={page >= Math.ceil(filteredSujets.length / perPage)} onClick={() => setPage(p => p + 1)}>Suivant</Button>
+          </div>
+        )}
+      </div>
       </div>
     </DashboardLayout>
   );

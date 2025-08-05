@@ -31,6 +31,8 @@ const AdminMemoires = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | string>('all');
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 3;
 
   const { data: memoires = [] } = useQuery<any[]>({
     queryKey: ['admin-memoires'],
@@ -50,13 +52,18 @@ const AdminMemoires = () => {
   // Helpers statuts
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      VALIDE_ENCADREUR: 'bg-yellow-100 text-yellow-800',
-      VALIDE_ADMIN: 'bg-green-100 text-green-800',
-      ARCHIVE: 'bg-purple-100 text-purple-800',
-      EN_REVISION: 'bg-orange-100 text-orange-800',
+      'VALIDE_ENCADREUR': 'bg-yellow-100 text-yellow-800',
+      'VALIDE_ADMIN': 'bg-green-100 text-green-800',
+      'VALIDE': 'bg-green-100 text-green-800',
+      'SOUTENU': 'bg-indigo-100 text-indigo-800',
+      'ARCHIVE': 'bg-purple-100 text-purple-800',
+      'EN_REVISION': 'bg-orange-100 text-orange-800',
     };
     return styles[status] ?? 'bg-gray-100 text-gray-800';
   };
+
+  // Reset page when filters change
+  React.useEffect(() => { setPage(1); }, [searchTerm, filterStatus]);
 
   const filteredMemoires = memoires.filter((m) => {
     const search = searchTerm.toLowerCase();
@@ -90,7 +97,7 @@ const AdminMemoires = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {filteredMemoires.map((memoire) => (
+              {filteredMemoires.slice((page-1)*ITEMS_PER_PAGE, page*ITEMS_PER_PAGE).map((memoire) => (
                 <div
                   key={memoire.id}
                   className="p-6 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
@@ -140,7 +147,21 @@ const AdminMemoires = () => {
                 </div>
               ))}
             </div>
+                      {filteredMemoires.length === 0 && (
+              <p className="text-center text-gray-500">Aucun mémoire trouvé.</p>
+            )}
           </CardContent>
+          {Math.ceil(filteredMemoires.length / ITEMS_PER_PAGE) > 1 && (
+            <div className="flex justify-center items-center gap-4 py-4">
+              <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>
+                Précédent
+              </Button>
+              <span className="text-sm">{page} / {Math.ceil(filteredMemoires.length / ITEMS_PER_PAGE)}</span>
+              <Button variant="outline" size="sm" disabled={page === Math.ceil(filteredMemoires.length / ITEMS_PER_PAGE)} onClick={() => setPage(page + 1)}>
+                Suivant
+              </Button>
+            </div>
+          )}
         </Card>
       </div>
     </DashboardLayout>

@@ -42,20 +42,11 @@ const Header = () => {
         
         {/* Logo + Titre */}
         <div className="flex items-center space-x-3">
-          {/* Logo ISI */}
-          <img
-            src="/logo-isi.jpg"  // placé dans le dossier public
-            alt="Logo ISI"
-            className="h-10 w-10 object-contain rounded-full border border-gray-200 shadow-sm"
-          />
+          
 
-          {/* Titre dynamique selon le rôle */}
-          <h2 className="text-lg font-medium text-gray-800">
-            {user?.role === 'ADMIN'
-              ? 'Administration'
-              : user?.role === 'ENCADREUR'
-              ? 'Espace Encadreur'
-              : 'Espace Étudiant'}
+          {/* Label rôle */}
+          <h2 className="text-xl font-bold text-gray-800">
+            {user.role === 'ADMIN' ? 'Administration' : user.role === 'ENCADREUR' ? 'Espace Encadreur' : 'Espace Étudiant'}
           </h2>
         </div>
 

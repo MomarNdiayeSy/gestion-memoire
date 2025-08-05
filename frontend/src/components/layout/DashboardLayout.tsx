@@ -24,7 +24,11 @@ const DashboardLayout = ({ children, allowedRoles }: DashboardLayoutProps) => {
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar fixe */}
         <div className="hidden md:flex md:flex-shrink-0">
-          <div className="w-64">
+          <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+            <div className="px-6 py-5 flex items-center gap-4 border-b border-gray-200 bg-white">
+              <img src="/logo-isi.jpg" alt="Logo ISI" className="h-12 w-12 object-contain" />
+              <h1 className="text-lg font-bold text-gray-800 leading-tight">Gestion&nbsp;<span className="whitespace-nowrap">mémoires</span></h1>
+            </div>
             <Sidebar />
           </div>
         </div>

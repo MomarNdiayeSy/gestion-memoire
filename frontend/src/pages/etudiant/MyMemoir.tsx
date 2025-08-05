@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { memoireApi, sessionApi } from '@/services/api';
+import { memoireApi, sessionApi, paymentApi } from '@/services/api';
 import { useAuth } from '@/stores/authStore';
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +23,7 @@ import {
   FileText,
   GraduationCap,
   Upload,
+  CreditCard,
   User
 } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
@@ -67,6 +68,12 @@ const MyMemoir = () => {
   const [isFinalDialogOpen, setIsFinalDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  // Pagination states (must stay before conditional returns)
+  const [versionPage, setVersionPage] = useState(1);
+  const versionsPerPage = 3;
+  const [commentPage, setCommentPage] = useState(1);
+  const commentsPerPage = 3;
+
   // Memoire de l'étudiant
   const { data: memoire, isFetching } = useQuery<any | null>({
     queryKey: ['my-memoire'],
@@ -108,8 +115,20 @@ const MyMemoir = () => {
   });
 
   const sessionsCount = sessions.filter((s: any) => s.etudiantId === user?.id).length;
+
+  // Paiements de l'étudiant
+  const { data: paiements = [] } = useQuery<any[]>({
+    queryKey: ['my-payments'],
+    queryFn: () => paymentApi.getAll(),
+  });
+
+  const TOTAL_FEES = 60000;
+  const paidAmount = paiements
+    .filter((p: any) => p.status === 'VALIDE')
+    .reduce((sum: number, p: any) => sum + p.montant, 0);
+  const paymentOk = paidAmount >= TOTAL_FEES;
   const alreadyFinal = Boolean((memoire as any)?.fichierFinalUrl) || ['SOUMIS_FINAL', 'VALIDE_ENCADREUR', 'VALIDE_ADMIN'].includes((memoire as any)?.status ?? '');
-  const canDepositFinal = memoire && !alreadyFinal && sessionsCount >= 10;
+  const canDepositFinal = memoire && !alreadyFinal && sessionsCount >= 10 && paymentOk;
 
   const finalMutation = useMutation({
     mutationFn: async (payload: { file: File; description: string }) => {
@@ -201,6 +220,15 @@ const MyMemoir = () => {
 
   const versions: Version[] = safeArray(((memoire as any).versions ?? (memoire as any).documents) as Version[]);
 
+  // Pagination states declared at top to keep hooks order consistent
+
+  const sortedVersions = safeArray((memoire as any).documents)
+    .slice()
+    .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const sortedGeneralComments = safeArray((memoire as any).commentaires)
+    .slice()
+    .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
   return (
     <DashboardLayout allowedRoles={['ETUDIANT']}>
       <div className="space-y-6">
@@ -212,7 +240,7 @@ const MyMemoir = () => {
           </div>
           <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-blue-600 to-violet-600">
+              <Button className="ml-4 bg-gradient-to-r from-blue-600 to-violet-600">
                 <Upload className="mr-2 h-4 w-4" />
                 Nouvelle Version
               </Button>
@@ -294,6 +322,11 @@ const MyMemoir = () => {
                         toast({ variant: 'destructive', title: 'Dépôt impossible', description: 'Vous devez effectuer au moins 10 séances avant de déposer votre fichier final.' });
                         return;
                       }
+                      if (!paymentOk) {
+                        e.preventDefault();
+                        toast({ variant: 'destructive', title: 'Paiement incomplet', description: 'Veuillez régler votre paiement avant de déposer votre fichier final.' });
+                        return;
+                      }
                     }}
                   >
                     <Upload className="mr-2 h-4 w-4" />
@@ -350,6 +383,8 @@ const MyMemoir = () => {
                     toast({ variant: 'destructive', title: 'Dépôt impossible', description: 'Le fichier final a déjà été déposé.' });
                   } else if (sessionsCount < 10) {
                     toast({ variant: 'destructive', title: 'Dépôt impossible', description: 'Vous devez effectuer au moins 10 séances avant de déposer votre fichier final.' });
+                  } else if (!paymentOk) {
+                    toast({ variant: 'destructive', title: 'Paiement incomplet', description: 'Veuillez régler votre paiement avant de déposer votre fichier final.' });
                   }
                 }}
               >
@@ -360,7 +395,7 @@ const MyMemoir = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -391,6 +426,23 @@ const MyMemoir = () => {
             </CardContent>
           </Card>
 
+          {/* Carte Paiement */}
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Paiement</p>
+                  <p className={`text-2xl font-bold ${paymentOk ? 'text-green-600' : 'text-red-600'} mt-2`}>
+                    {paidAmount.toLocaleString()} / {TOTAL_FEES.toLocaleString()} CFA
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                  <CreditCard className="h-6 w-6 text-emerald-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="border-0 shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -407,7 +459,7 @@ const MyMemoir = () => {
             </CardContent>
           </Card>
         </div>
-
+        
         {/* Informations Générales */}
         <Card className="border-0 shadow-lg">
           <CardHeader>
@@ -458,9 +510,8 @@ const MyMemoir = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {safeArray((memoire as any).documents)
-                .slice()
-                .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              {sortedVersions
+                .slice((versionPage - 1) * versionsPerPage, versionPage * versionsPerPage)
                 .map((version: any) => (
                   <div
                     key={version.id}
@@ -488,6 +539,19 @@ const MyMemoir = () => {
                     </div>
                   </div>
                 ))}
+              <div className="flex justify-center mt-4">
+                {[...Array(Math.ceil(sortedVersions.length / versionsPerPage))].map((_, i) => (
+                  <Button
+                    key={i}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setVersionPage(i + 1)}
+                    className={versionPage === i + 1 ? 'bg-blue-600 text-white' : ''}
+                  >
+                    {i + 1}
+                  </Button>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -500,26 +564,31 @@ const MyMemoir = () => {
           <CardContent>
             <div className="space-y-4">
               {/* Commentaires généraux */}
-              {safeArray((memoire as any).commentaires)
-              .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-              .map((commentaire: any) => (
-                <div
-                  key={commentaire.id}
-                  className="p-4 border border-gray-200 rounded-lg"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <User className="h-4 w-4 text-gray-400" />
-                      <span className="font-medium text-gray-900">{commentaire.auteur}</span>
+              {sortedGeneralComments
+                .slice((commentPage - 1) * commentsPerPage, commentPage * commentsPerPage)
+                .map((commentaire: any) => (
+                  <div
+                    key={commentaire.id}
+                    className="p-4 border border-gray-200 rounded-lg"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <User className="h-4 w-4 text-gray-400" />
+                        <span className="font-medium text-gray-900">{commentaire.auteur}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Clock className="h-4 w-4 mr-2" />
-                      {new Date(commentaire.date).toLocaleDateString()}
-                    </div>
+                    <p className="text-gray-600">{commentaire.texte}</p>
                   </div>
-                  <p className="text-gray-600">{commentaire.texte}</p>
+                ))}
+
+              {/* Pagination controls for general comments */}
+              {sortedGeneralComments.length > commentsPerPage && (
+                <div className="flex justify-center mt-4 space-x-4">
+                  <Button variant="outline" disabled={commentPage === 1} onClick={() => setCommentPage(p => Math.max(1, p - 1))}>Précédent</Button>
+                  <span className="text-sm self-center text-gray-600">Page {commentPage} / {Math.ceil(sortedGeneralComments.length / commentsPerPage)}</span>
+                  <Button variant="outline" disabled={commentPage >= Math.ceil(sortedGeneralComments.length / commentsPerPage)} onClick={() => setCommentPage(p => p + 1)}>Suivant</Button>
                 </div>
-              ))}
+              )}
 
               {/* Commentaires par version */}
               {safeArray((memoire as any).documents)

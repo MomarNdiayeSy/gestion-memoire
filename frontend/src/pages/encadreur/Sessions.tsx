@@ -233,7 +233,23 @@ const Sessions = () => {
     return type === 'VIRTUEL' ? 'bg-purple-100 text-purple-800' : 'bg-orange-100 text-orange-800';
   };
 
-  const submitAccept = () => {
+  // Helper functions for badge colors
+const getTypeBadgeStyle = (type: string) => {
+  return type === 'VIRTUEL'
+    ? 'bg-purple-100 text-purple-800'
+    : 'bg-blue-100 text-blue-800'; // PRESENTIEL
+};
+
+const getStatusBadgeStyle = (statut: string) => {
+  const styles: Record<string, string> = {
+    EN_ATTENTE: 'bg-yellow-100 text-yellow-800',
+    ACCEPTEE: 'bg-green-100 text-green-800',
+    REFUSEE: 'bg-red-100 text-red-800',
+  };
+  return styles[statut] || 'bg-gray-100 text-gray-800';
+};
+
+const submitAccept = () => {
     const data: any = { statut: 'ACCEPTEE', duree: acceptForm.duree };
     if (requestToAccept.type === 'VIRTUEL') data.meetingLink = acceptForm.meetingLink;
     if (requestToAccept.type === 'PRESENTIEL') data.salle = acceptForm.salle;
@@ -246,28 +262,53 @@ const Sessions = () => {
         {/* Page Header */}
         {sessionRequests.length > 0 && (
           <div className="mt-6">
-            <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2"><MessageSquare className="h-5 w-5"/> Demandes de session</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {sessionRequests.map(req => (
-                <Card key={req.id} className="shadow-sm">
-                  <CardContent className="p-4 space-y-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  Demandes de session
+                  <Badge className="ml-2 bg-blue-600 text-white">{sessionRequests.length}</Badge>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent sideOffset={12} className="w-96 max-h-96 overflow-y-auto ml-6">
+                <div className="p-2 text-sm font-medium text-gray-700">Demandes de session</div>
+                {sessionRequests.map((req) => (
+                  <DropdownMenuItem key={req.id} className="py-2 flex flex-col space-y-1">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">{new Date(req.date).toLocaleDateString()} à {req.heure}</span>
-                      <Badge variant="outline">{req.type}</Badge>
+                      <span className="text-xs text-gray-500">
+                        {new Date(req.date).toLocaleDateString()} à {req.heure}
+                      </span>
+                      <Badge className={getTypeBadgeStyle(req.type)}>{req.type}</Badge>
                     </div>
-                    <p className="text-gray-800 text-sm">Étudiant : {req.etudiant?.prenom} {req.etudiant?.nom}</p>
+                    <p className="text-sm">
+                      Étudiant : {req.etudiant?.prenom} {req.etudiant?.nom}
+                    </p>
                     {req.statut === 'EN_ATTENTE' ? (
                       <div className="flex gap-2 pt-2">
-                        <Button size="sm" onClick={() => handleRequestAction(req, 'ACCEPTEE')} className="bg-green-600 hover:bg-green-700 text-white">Accepter</Button>
-                        <Button size="sm" variant="destructive" onClick={() => handleRequestAction(req, 'REFUSEE')}>Refuser</Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleRequestAction(req, 'ACCEPTEE')}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          Accepter
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleRequestAction(req, 'REFUSEE')}
+                        >
+                          Refuser
+                        </Button>
                       </div>
                     ) : (
-                      <Badge variant="outline" className="mt-2">{req.statut}</Badge>
+                      <Badge className={`${getStatusBadgeStyle(req.statut)} mt-2`}>
+                        {req.statut}
+                      </Badge>
                     )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
 

@@ -42,7 +42,7 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-violet-50 to-purple-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-lg">
         
         {/* Logo et titre */}
         <div className="text-center mb-8">
@@ -53,7 +53,6 @@ const Login = () => {
               className="h-16 w-16 object-contain rounded-full border border-gray-200 shadow-sm"
             />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Plateforme ISI</h1>
           <p className="text-gray-600">Gestion des Mémoires Académiques</p>
         </div>
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,6 +31,19 @@ import { sessionApi } from '@/services/api';
 import { Session, SessionRequest } from "@/lib/session";
 import { MessageSquare } from 'lucide-react';
 import SessionCard from "@/components/SessionCard";
+
+// Helper badge style functions
+const getTypeBadgeStyle = (type: string) =>
+  type === 'VIRTUEL' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800';
+
+const getStatusBadgeStyle = (statut: string) => {
+  const styles: Record<string, string> = {
+    EN_ATTENTE: 'bg-yellow-100 text-yellow-800',
+    ACCEPTEE: 'bg-green-100 text-green-800',
+    REFUSEE: 'bg-red-100 text-red-800',
+  };
+  return styles[statut] || 'bg-gray-100 text-gray-800';
+};
 
 const MentoringSessions = () => {
   const queryClient = useQueryClient();
@@ -64,6 +78,10 @@ const MentoringSessions = () => {
   });
 
   const lowerSearch = searchTerm.toLowerCase();
+  // Pagination
+  const [page, setPage] = React.useState(1);
+  const itemsPerPage = 3;
+
   const filteredSessions = sessions.filter(session => {
     const matchesSearch =
       lowerSearch === '' ? true :
@@ -108,6 +126,40 @@ const MentoringSessions = () => {
 
   return (
     <DashboardLayout allowedRoles={['ETUDIANT']}>
+              {/* Mes demandes de session */}
+              {sessionRequests.length > 0 ? (
+          <div className="space-y-4 mt-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  Mes demandes de session
+                  <Badge className="ml-2 bg-blue-600 text-white">{sessionRequests.length}</Badge>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent sideOffset={2} className="w-96 max-h-96 overflow-y-auto ml-6 mt-2">
+                <div className="p-2 text-sm font-medium text-gray-700">Mes demandes de session</div>
+                {sessionRequests.map((req: SessionRequest) => (
+                  <DropdownMenuItem key={req.id} className="py-2 flex flex-col space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-500">
+                        {new Date(req.date).toLocaleDateString()} à {req.heure}
+                      </span>
+                      <Badge className={getTypeBadgeStyle(req.type)}>{req.type}</Badge>
+                    </div>
+                    <p className="text-sm">Encadreur : {req.encadreur?.prenom} {req.encadreur?.nom}</p>
+                    <Badge className={`${getStatusBadgeStyle(req.statut)} mt-1`}>
+                      {req.statut.replace('_', ' ')}
+                    </Badge>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ) : (
+          <p className="text-center text-gray-500 mt-8">Aucune demande de session pour le moment.</p>
+        )}
+
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -115,6 +167,7 @@ const MentoringSessions = () => {
             <h1 className="text-3xl font-bold text-gray-900">Sessions de Mentorat</h1>
             <p className="text-gray-600 mt-1">Gérez vos sessions avec votre encadreur</p>
           </div>
+          
           <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-blue-600 to-violet-600">
@@ -206,29 +259,6 @@ const MentoringSessions = () => {
           </Card>
         </div>
 
-        {/* Liste des demandes de session */}
-        {sessionRequests.length > 0 ? (
-          <div className="space-y-4 mt-8">
-            <h2 className="text-xl font-semibold text-gray-800">Mes demandes de session</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {sessionRequests.map((req: SessionRequest) => (
-                <div key={req.id} className="border rounded-lg p-4 shadow-sm bg-white">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-600">{req.type}</span>
-                    <span className={`text-xs px-2 py-1 rounded-full ${req.statut === 'EN_ATTENTE' ? 'bg-yellow-100 text-yellow-800' : req.statut === 'ACCEPTEE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{req.statut.replace('_', ' ')}</span>
-                  </div>
-                  <p className="text-gray-800 text-sm">Date : {new Date(req.date).toLocaleDateString()} à {req.heure}</p>
-                  {req.encadreur && (
-                    <p className="text-gray-500 text-sm mt-1">Encadreur : {req.encadreur.prenom} {req.encadreur.nom}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <p className="text-center text-gray-500 mt-8">Aucune demande de session pour le moment.</p>
-        )}
-
         {/* Filters */}
         <Card className="border-0 shadow-lg">
           <CardContent className="p-6">
@@ -261,7 +291,9 @@ const MentoringSessions = () => {
 
         {/* Sessions Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredSessions.map((session) => (
+          {filteredSessions
+              .slice((page - 1) * itemsPerPage, page * itemsPerPage)
+              .map((session) => (
             <SessionCard
               key={session.id}
               session={session}
@@ -278,6 +310,29 @@ const MentoringSessions = () => {
             </div>
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {filteredSessions.length > itemsPerPage && (
+          <div className="flex justify-center mt-6 space-x-4">
+            <Button
+              variant="outline"
+              disabled={page === 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Précédent
+            </Button>
+            <span className="text-sm text-gray-600 self-center">
+              Page {page} / {Math.ceil(filteredSessions.length / itemsPerPage)}
+            </span>
+            <Button
+              variant="outline"
+              disabled={page >= Math.ceil(filteredSessions.length / itemsPerPage)}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Suivant
+            </Button>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

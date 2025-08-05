@@ -93,6 +93,10 @@ const SubjectSelection = () => {
     createMemoireMutation.mutate(selectedSujet);
   };
 
+  // Pagination
+  const [page, setPage] = React.useState(1);
+  const itemsPerPage = 2;
+
   const filteredSujets = (sujets as any[]).filter(sujet => {
     const matchesSearch =
       sujet.titre.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -210,7 +214,9 @@ const SubjectSelection = () => {
 
         {/* Sujets Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredSujets.map((sujet) => {
+          {filteredSujets
+            .slice((page - 1) * itemsPerPage, page * itemsPerPage)
+            .map((sujet) => {
             const chosenSujetId = (memoire as any)?.sujetId ?? (memoire as any)?.sujet?.id;
             const isChosen = chosenSujetId === sujet.id || (!memoire && selectedSujet?.id === sujet.id);
             const isSelected = isChosen || selectedSujet?.id === sujet.id;
@@ -314,6 +320,29 @@ const SubjectSelection = () => {
             </div>
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {filteredSujets.length > itemsPerPage && (
+          <div className="flex justify-center mt-6 space-x-4">
+            <Button
+              variant="outline"
+              disabled={page === 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Précédent
+            </Button>
+            <span className="text-sm text-gray-600 self-center">
+              Page {page} / {Math.ceil(filteredSujets.length / itemsPerPage)}
+            </span>
+            <Button
+              variant="outline"
+              disabled={page >= Math.ceil(filteredSujets.length / itemsPerPage)}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Suivant
+            </Button>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
