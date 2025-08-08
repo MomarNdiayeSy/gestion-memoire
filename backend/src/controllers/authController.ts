@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 
 export const register = async (req: Request, res: Response) => {
   try {
-    const { email, password, nom, prenom, role, specialite, matricule, telephone } = req.body;
+    const { email, password, nom, prenom, role, specialite, matricule, telephone, level, academicYear } = req.body;
 
     // Vérifier si l'utilisateur existe déjà
     const existingUser = await prisma.user.findUnique({
@@ -28,8 +28,13 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'La spécialité est requise pour un encadreur' });
     }
 
-    if (role === 'ETUDIANT' && !matricule) {
-      return res.status(400).json({ message: 'Le matricule est requis pour un étudiant' });
+    if (role === 'ETUDIANT') {
+      if (!matricule) {
+        return res.status(400).json({ message: 'Le matricule est requis pour un étudiant' });
+      }
+      if (!level || !academicYear) {
+        return res.status(400).json({ message: 'Le niveau (LICENCE/MASTER) et l\'année académique sont requis pour un étudiant' });
+      }
     }
 
     // Hasher le mot de passe
@@ -45,6 +50,8 @@ export const register = async (req: Request, res: Response) => {
         role,
         specialite: role === 'ENCADREUR' ? specialite : null,
         matricule: role === 'ETUDIANT' ? matricule : null,
+        level: role === 'ETUDIANT' ? level : null,
+        academicYear: role === 'ETUDIANT' ? academicYear : null,
         telephone,
       },
     });

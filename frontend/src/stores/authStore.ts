@@ -7,6 +7,8 @@ interface User {
   role: 'ADMIN' | 'ENCADREUR' | 'ETUDIANT';
   nom: string;
   prenom: string;
+  level?: 'LICENCE' | 'MASTER' | null;
+  academicYear?: string | null;
 }
 
 interface AuthState {

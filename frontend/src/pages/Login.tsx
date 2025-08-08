@@ -152,7 +152,7 @@ const Login = () => {
         {/* Footer */}
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-500">
-            Plateforme de Gestion des Mémoires - ISI © 2025
+            Gestion des Mémoires - ISI © 2025
           </p>
         </div>
       </div>

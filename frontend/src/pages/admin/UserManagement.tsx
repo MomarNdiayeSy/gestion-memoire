@@ -40,6 +40,8 @@ interface User {
   role: string;
   telephone: string;
   matricule?: string;
+  level?: 'LICENCE' | 'MASTER' | '';
+  academicYear?: string;
   specialite?: string;
 }
 
@@ -56,13 +58,15 @@ const UserManagement = () => {
     : (usersResponse as any)?.users ?? [];
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newUser, setNewUser] = useState<{ email: string; password: string; nom: string; prenom: string; role: 'ADMIN' | 'ENCADREUR' | 'ETUDIANT'; telephone: string; matricule?: string; specialite?: string }>({
+  const [newUser, setNewUser] = useState<{ email: string; password: string; nom: string; prenom: string; role: 'ADMIN' | 'ENCADREUR' | 'ETUDIANT'; telephone: string; matricule?: string; level?: 'LICENCE' | 'MASTER' | ''; academicYear?: string; specialite?: string }>({
     email: '',
     password: '',
     nom: '',
     prenom: '',
     role: 'ETUDIANT',
     telephone: '',
+    level: '',
+    academicYear: '',
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
@@ -98,11 +102,15 @@ const UserManagement = () => {
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     const payload = { ...newUser } as any;
-    if (payload.role !== 'ETUDIANT') delete payload.matricule;
+    if (payload.role !== 'ETUDIANT') {
+      delete payload.matricule;
+      delete payload.level;
+      delete payload.academicYear;
+    }
     if (payload.role !== 'ENCADREUR') delete payload.specialite;
     await addUserMutation.mutateAsync(payload);
     setIsAddDialogOpen(false);
-    setNewUser({ email: '', password: '', nom: '', prenom: '', role: 'ETUDIANT', telephone: '', matricule: '', specialite: '' });
+    setNewUser({ email: '', password: '', nom: '', prenom: '', role: 'ETUDIANT', telephone: '', matricule: '', level: '', academicYear: '', specialite: '' });
   };
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -111,16 +119,20 @@ const UserManagement = () => {
   const handleEditUser = (user: User) => {
     setEditingUser(user);
     setIsEditDialogOpen(true);
-    setEditForm({ email: user.email, nom: user.nom, prenom: user.prenom, telephone: user.telephone ?? '', role: user.role, matricule: user.matricule ?? '', specialite: user.specialite ?? '' });
+    setEditForm({ email: user.email, nom: user.nom, prenom: user.prenom, telephone: user.telephone ?? '', role: user.role, matricule: user.matricule ?? '', level: user.level ?? '', academicYear: user.academicYear ?? '', specialite: user.specialite ?? '' });
   };
 
-  const [editForm, setEditForm] = useState<{ email: string; nom: string; prenom: string; telephone: string; role: string; matricule?: string; specialite?: string }>({ email: '', nom: '', prenom: '', telephone: '', role: 'ETUDIANT', matricule: '', specialite: '' });
+  const [editForm, setEditForm] = useState<{ email: string; nom: string; prenom: string; telephone: string; role: string; matricule?: string; level?: 'LICENCE' | 'MASTER' | ''; academicYear?: string; specialite?: string }>({ email: '', nom: '', prenom: '', telephone: '', role: 'ETUDIANT', matricule: '', level: '', academicYear: '', specialite: '' });
 
   const submitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
     const updatePayload = { ...editForm } as any;
-    if (updatePayload.role !== 'ETUDIANT') delete updatePayload.matricule;
+    if (updatePayload.role !== 'ETUDIANT') {
+      delete updatePayload.matricule;
+      delete updatePayload.level;
+      delete updatePayload.academicYear;
+    }
     if (updatePayload.role !== 'ENCADREUR') delete updatePayload.specialite;
     await updateUserMutation.mutateAsync({ id: editingUser.id, data: updatePayload });
   };
@@ -272,6 +284,8 @@ const UserManagement = () => {
                     <th className="text-left py-3 px-4 font-medium text-gray-700">Email</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-700">Rôle</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-700">Téléphone</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Niveau</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Année</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
                   </tr>
                 </thead>
@@ -298,6 +312,8 @@ const UserManagement = () => {
                           <Badge className={getRoleBadgeClass(user.role)}>{user.role}</Badge>
                         </td>
                         <td className="py-4 px-4 text-gray-600">{user.telephone}</td>
+                         <td className="py-4 px-4 text-gray-600">{user.role === 'ETUDIANT' ? user.level ?? '-' : '-'}</td>
+                         <td className="py-4 px-4 text-gray-600">{user.role === 'ETUDIANT' ? user.academicYear ?? '-' : '-'}</td>
                         <td className="py-4 px-4">
                           <div className="flex space-x-2">
                             <Button size="sm" variant="outline" className="text-blue-600 border-blue-600 hover:bg-blue-50" onClick={() => handleEditUser(user)}>
@@ -330,8 +346,18 @@ const UserManagement = () => {
               </div>
               <Input placeholder="Téléphone" value={newUser.telephone} onChange={e => setNewUser({ ...newUser, telephone: e.target.value })} />
               {newUser.role === 'ETUDIANT' && (
-                <Input placeholder="Matricule" value={newUser.matricule ?? ''} onChange={e => setNewUser({ ...newUser, matricule: e.target.value })} />
-              )}
+                 <>
+                   <Input placeholder="Matricule" value={newUser.matricule ?? ''} onChange={e => setNewUser({ ...newUser, matricule: e.target.value })} />
+                   <Select value={newUser.level ?? ''} onValueChange={(v) => setNewUser({ ...newUser, level: v as 'LICENCE' | 'MASTER' | '' })}>
+                     <SelectTrigger><SelectValue placeholder="Niveau" /></SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="LICENCE">LICENCE</SelectItem>
+                       <SelectItem value="MASTER">MASTER</SelectItem>
+                     </SelectContent>
+                   </Select>
+                   <Input placeholder="Année académique" value={newUser.academicYear ?? ''} onChange={e => setNewUser({ ...newUser, academicYear: e.target.value })} />
+                 </>
+               )}
               {newUser.role === 'ENCADREUR' && (
                 <Input placeholder="Spécialité" value={newUser.specialite ?? ''} onChange={e => setNewUser({ ...newUser, specialite: e.target.value })} />
               )}
@@ -360,8 +386,18 @@ const UserManagement = () => {
               </div>
               <Input placeholder="Téléphone" value={editForm.telephone} onChange={e => setEditForm({ ...editForm, telephone: e.target.value })} />
               {editForm.role === 'ETUDIANT' && (
-                <Input placeholder="Matricule" value={editForm.matricule ?? ''} onChange={e => setEditForm({ ...editForm, matricule: e.target.value })} />
-              )}
+                 <>
+                   <Input placeholder="Matricule" value={editForm.matricule ?? ''} onChange={e => setEditForm({ ...editForm, matricule: e.target.value })} />
+                   <Select value={editForm.level ?? ''} onValueChange={(v) => setEditForm({ ...editForm, level: v as 'LICENCE' | 'MASTER' | '' })}>
+                     <SelectTrigger><SelectValue placeholder="Niveau" /></SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="LICENCE">LICENCE</SelectItem>
+                       <SelectItem value="MASTER">MASTER</SelectItem>
+                     </SelectContent>
+                   </Select>
+                   <Input placeholder="Année académique" value={editForm.academicYear ?? ''} onChange={e => setEditForm({ ...editForm, academicYear: e.target.value })} />
+                 </>
+               )}
               {editForm.role === 'ENCADREUR' && (
                 <Input placeholder="Spécialité" value={editForm.specialite ?? ''} onChange={e => setEditForm({ ...editForm, specialite: e.target.value })} />
               )}

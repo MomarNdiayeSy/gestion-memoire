@@ -33,8 +33,10 @@ export const updateProfile = async (req: Request, res: Response) => {
     if (currentUser.role === 'ENCADREUR' && specialite) {
       updateData.specialite = specialite;
     }
-    if (currentUser.role === 'ETUDIANT' && matricule) {
-      updateData.matricule = matricule;
+    if (currentUser.role === 'ETUDIANT') {
+      if (matricule) updateData.matricule = matricule;
+      if (req.body.level) updateData.level = req.body.level;
+      if (req.body.academicYear) updateData.academicYear = req.body.academicYear;
     }
 
     // Mettre à jour l'utilisateur
@@ -135,6 +137,8 @@ export const getUsers = async (req: Request, res: Response) => {
           nom: true,
           prenom: true,
           role: true,
+          level: true,
+          academicYear: true,
           specialite: true,
           matricule: true,
           telephone: true,
@@ -290,7 +294,7 @@ export const updateUser = async (req: Request, res: Response) => {
     }
 
     const { id } = req.params;
-    const { email: newEmail, nom, prenom, telephone, role, matricule, specialite } = req.body;
+    const { email: newEmail, nom, prenom, telephone, role, matricule, level, academicYear, specialite } = req.body;
 
     // Si un nouvel email est fourni, vérifier son unicité
     if (newEmail) {
@@ -314,7 +318,9 @@ export const updateUser = async (req: Request, res: Response) => {
         telephone,
         ...(newEmail ? { email: newEmail } : {}),
         ...(role ? { role } : {}),
-        ...(role === 'ETUDIANT' ? { matricule } : {}),
+        ...(typeof matricule !== 'undefined' ? { matricule } : {}),
+        ...(typeof level !== 'undefined' ? { level } : {}),
+        ...(typeof academicYear !== 'undefined' ? { academicYear } : {}),
         ...(role === 'ENCADREUR' ? { specialite } : {}),
       },
       select: {

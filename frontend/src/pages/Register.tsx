@@ -31,6 +31,8 @@ const Register = () => {
     role: '',
     specialite: '',
     matricule: '',
+    level: '',
+    academicYear: '',
     telephone: '',
   });
   const [error, setError] = React.useState('');
@@ -168,16 +170,47 @@ const Register = () => {
               )}
 
               {formData.role === 'ETUDIANT' && (
-                <div className="space-y-2">
-                  <Label htmlFor="matricule">Matricule</Label>
-                  <Input
-                    id="matricule"
-                    value={formData.matricule}
-                    onChange={(e) => setFormData({...formData, matricule: e.target.value})}
-                    className="h-11"
-                    required
-                  />
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="matricule">Matricule</Label>
+                    <Input
+                      id="matricule"
+                      value={formData.matricule}
+                      onChange={(e) => setFormData({...formData, matricule: e.target.value})}
+                      className="h-11"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="level">Niveau</Label>
+                    <Select
+                      value={formData.level}
+                      onValueChange={(value) => setFormData({...formData, level: value})}
+                      required
+                    >
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder="Sélectionnez le niveau" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="LICENCE">Licence</SelectItem>
+                        <SelectItem value="MASTER">Master</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="academicYear">Année académique</Label>
+                    <Input
+                      id="academicYear"
+                      placeholder="2024-2025"
+                      value={formData.academicYear}
+                      onChange={(e) => setFormData({...formData, academicYear: e.target.value})}
+                      className="h-11"
+                      required
+                    />
+                  </div>
+                </>
               )}
 
               <div className="space-y-2">
@@ -215,7 +248,7 @@ const Register = () => {
 
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-500">
-            Plateforme de Gestion des Mémoires - ISI © 2025
+            Gestion des Mémoires - ISI © 2025
           </p>
         </div>
       </div>

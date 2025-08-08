@@ -19,6 +19,11 @@ enum UserRole {
   ETUDIANT
 }
 
+enum StudentLevel {
+  LICENCE
+  MASTER
+}
+
 enum MemoireStatus {
   EN_COURS
   SOUMIS
@@ -63,6 +68,8 @@ model User {
   role       String // ADMIN, ENCADREUR, ETUDIANT
   specialite String? // Pour les encadreurs
   matricule  String? // Pour les étudiants
+  level      StudentLevel? // LICENCE ou MASTER (uniquement pour les étudiants)
+  academicYear String? // ex. "2024-2025" (uniquement pour les étudiants)
   telephone  String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
