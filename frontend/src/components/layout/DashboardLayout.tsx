@@ -6,9 +6,12 @@ import Sidebar from './Sidebar';
 interface DashboardLayoutProps {
   children: React.ReactNode;
   allowedRoles?: string[];
+  userRole?: 'admin' | 'encadreur' | 'etudiant';
+  userName?: string;
+  onNavigate?: (page: string) => void;
 }
 
-const DashboardLayout = ({ children, allowedRoles }: DashboardLayoutProps) => {
+const DashboardLayout = ({ children, allowedRoles, userRole, userName, onNavigate }: DashboardLayoutProps) => {
   const { user, isAuthenticated } = useAuth();
 
   if (!isAuthenticated) {

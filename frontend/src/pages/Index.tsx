@@ -18,7 +18,6 @@ import SubjectSelection from './etudiant/SubjectSelection';
 import MyMemoir from './etudiant/MyMemoir';
 import MentoringSessions from './etudiant/MentoringSessions';
 import Payment from './etudiant/Payment';
-import Documents from './etudiant/Documents';
 
 const Index = () => {
   // Simulation d'authentification - à remplacer par un vrai système
@@ -80,7 +79,6 @@ const Index = () => {
         case 'my-memoir': return <MyMemoir />;
         case 'sessions': return <MentoringSessions />;
         case 'payment': return <Payment />;
-        case 'documents': return <Documents />;
         default: return <EtudiantDashboard />;
       }
     }

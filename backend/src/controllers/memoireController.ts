@@ -18,8 +18,9 @@ export const getMyMemoire = async (req: Request, res: Response) => {
       }
     });
 
+    // Retourner un objet vide si aucun mémoire n'est trouvé
     if (!memoire) {
-      return res.status(404).json({ message: 'Mémoire non trouvé' });
+      return res.json(null);
     }
 
     res.json(memoire);
@@ -44,47 +45,82 @@ export const createMemoire = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Vous avez déjà un mémoire en cours" });
     }
 
-    // Récupérer le sujet pour vérifier l'encadreur
+    // Vérifier si le sujet est disponible
     const sujet = await prisma.sujet.findUnique({
-      where: { id: sujetId }
+      where: { id: sujetId },
+      include: { memoires: true }
     });
 
     if (!sujet) {
       return res.status(404).json({ message: "Sujet non trouvé" });
     }
 
-    // Créer le mémoire
-    const memoire = await prisma.memoire.create({
-      data: {
-        titre,
-        description,
-        motsCles,
-        status: "EN_COURS",
-        etudiantId: etudiantId!,
-        encadreurId: sujet.encadreurId,
-        sujetId
-      }
-    });
+    // Vérifier que le sujet est valide
+    if (sujet.status !== 'VALIDE') {
+      return res.status(400).json({ message: "Ce sujet n'est pas disponible" });
+    }
 
-    // Créer l'historique
-    await prisma.historiqueMemoireStatus.create({
-      data: {
-        status: "EN_COURS",
-        commentaire: "Création du mémoire",
-        memoireId: memoire.id
-      }
+    // Vérifier que le sujet n'est pas déjà attribué
+    if (sujet.memoires && sujet.memoires.length > 0) {
+      return res.status(400).json({ message: "Ce sujet a déjà été attribué" });
+    }
+
+    // Utiliser une transaction pour garantir l'intégrité des données
+    const result = await prisma.$transaction(async (prisma) => {
+      // Créer le mémoire
+      const memoire = await prisma.memoire.create({
+        data: {
+          titre,
+          description,
+          motsCles,
+          status: "EN_COURS",
+          etudiantId: etudiantId!,
+          encadreurId: sujet.encadreurId,
+          sujetId
+        },
+        include: {
+          sujet: true,
+          encadreur: {
+            select: {
+              nom: true,
+              prenom: true,
+              email: true
+            }
+          }
+        }
+      });
+
+      // Mettre à jour le statut du sujet
+      await prisma.sujet.update({
+        where: { id: sujetId },
+        data: { status: 'ATTRIBUE' }
+      });
+
+      // Créer l'historique
+      await prisma.historiqueMemoireStatus.create({
+        data: {
+          status: "EN_COURS",
+          commentaire: "Création du mémoire",
+          memoireId: memoire.id
+        }
+      });
+
+      return memoire;
     });
 
     // Créer une notification pour l'encadreur
     await prisma.notification.create({
       data: {
         titre: "Nouveau mémoire",
-        message: `Un nouveau mémoire a été créé pour votre sujet "${sujet.titre}"`,
-        userId: sujet.encadreurId
+        message: `Un nouveau mémoire a été créé pour votre sujet "${result.sujet.titre}"`,
+        userId: result.encadreurId
       }
     });
 
-    res.status(201).json(memoire);
+    // Envoyer un email de notification à l'encadreur
+    // À implémenter avec votre service d'email
+
+    res.status(201).json(result);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Erreur lors de la création du mémoire" });

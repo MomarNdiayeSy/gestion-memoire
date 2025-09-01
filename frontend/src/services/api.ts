@@ -145,9 +145,12 @@ export const memoireApi = {
       const response = await api.get('/memoires/me');
       return response.data;
     } catch (error: any) {
+      // Ne pas logger l'erreur 404 car c'est un cas normal (pas encore de mémoire)
       if (error.response?.status === 404) {
-        return null; // Aucun mémoire pour l'étudiant
+        return null;
       }
+      // Pour les autres erreurs, on log et on relance
+      console.error('Erreur lors de la récupération du mémoire:', error);
       throw error;
     }
   },

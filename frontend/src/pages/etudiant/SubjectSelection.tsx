@@ -50,6 +50,9 @@ const SubjectSelection = () => {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [filterEncadreur, setFilterEncadreur] = React.useState('all');
   const [selectedSujet, setSelectedSujet] = React.useState<Sujet | null>(null);
+  const [page, setPage] = React.useState(1);
+  const itemsPerPage = 2;
+  const [isProcessing, setIsProcessing] = React.useState(false);
 
   // Récupération des sujets disponibles depuis le backend
   const queryClient = useQueryClient();
@@ -59,43 +62,69 @@ const SubjectSelection = () => {
   });
 
   // Mémoire déjà choisi par l'étudiant (s'il existe)
-  const { data: memoire } = useQuery({
+  const { data: memoire, isLoading: isLoadingMemoire } = useQuery({
     queryKey: ['memoire'],
     queryFn: () => memoireApi.getMy(),
-    staleTime: 1000 * 60 // 1 min
+    staleTime: 1000 * 60, // 1 min
+    retry: 1,
+    refetchOnWindowFocus: false
   });
 
-  const hasChosen = !!memoire && (!!memoire.id || !!(memoire as any)?.sujetId || !!(memoire as any)?.sujet?.id) || !!selectedSujet;
+  // Vérifier si l'étudiant a déjà choisi un sujet
+  const hasChosen = React.useMemo(() => {
+    if (isLoadingMemoire) return false;
+    return !!(memoire?.id || memoire?.sujetId || memoire?.sujet?.id || selectedSujet);
+  }, [memoire, selectedSujet, isLoadingMemoire]);
 
-  const handleSelectSujet = (sujet: Sujet) => {
-    setSelectedSujet(sujet);
+  const handleSelectSujet = async (sujet: Sujet) => {
+    if (hasChosen || isProcessing) return;
+    
+    try {
+      setIsProcessing(true);
+      
+      // Créer le mémoire
+      const nouveauMemoire = await memoireApi.create({
+        titre: sujet.titre,
+        description: sujet.description,
+        motsCles: sujet.motsCles ?? [],
+        sujetId: sujet.id,
+      });
+      
+      // Mettre à jour le cache localement
+      queryClient.setQueryData(['memoire'], {
+        ...nouveauMemoire,
+        sujet: {
+          ...sujet,
+          status: 'ATTRIBUE' // Mettre à jour le statut du sujet
+        },
+        encadreur: sujet.encadreur
+      });
+      
+      // Invalider les requêtes pour forcer le rechargement
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['memoire'] }),
+        queryClient.invalidateQueries({ queryKey: ['sujets'] })
+      ]);
+      
+      toast({
+        title: 'Succès',
+        description: 'Le sujet a été sélectionné avec succès',
+        variant: 'default'
+      });
+      
+    } catch (error: any) {
+      console.error('Erreur lors de la sélection du sujet:', error);
+      const errorMessage = error.response?.data?.message || 'Une erreur est survenue';
+      toast({
+        title: 'Erreur',
+        description: `Impossible de sélectionner ce sujet: ${errorMessage}`,
+        variant: 'destructive'
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const createMemoireMutation = useMutation({
-    mutationFn: (sujet: Sujet) => memoireApi.create({
-      titre: sujet.titre,
-      description: sujet.description,
-      motsCles: sujet.motsCles ?? [],
-      sujetId: sujet.id,
-    }),
-    onSuccess: () => {
-      toast({ title: 'Sujet sélectionné', description: 'Votre mémoire a été créé avec succès' });
-      queryClient.invalidateQueries({ queryKey: ['memoire'] });
-      queryClient.invalidateQueries({ queryKey: ['sujets'] });
-    },
-    onError: () => {
-      toast({ title: 'Erreur', description: 'Impossible de créer votre mémoire', variant: 'destructive' });
-    },
-  });
-
-  const handleConfirmSelection = () => {
-    if (!selectedSujet) return;
-    createMemoireMutation.mutate(selectedSujet);
-  };
-
-  // Pagination
-  const [page, setPage] = React.useState(1);
-  const itemsPerPage = 2;
 
   const filteredSujets = (sujets as any[]).filter(sujet => {
     const matchesSearch =
@@ -119,13 +148,31 @@ const SubjectSelection = () => {
     }
   };
 
+  if (isLoading || isLoadingMemoire) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout allowedRoles={['ETUDIANT']}>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Sélection du Sujet</h1>
-          <p className="text-gray-600 mt-1">Choisissez votre sujet de mémoire parmi les propositions disponibles</p>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Sélection de sujet</h1>
+            <p className="text-muted-foreground">
+              {hasChosen 
+                ? (memoire?.sujet?.titre 
+                    ? `Vous avez sélectionné le sujet : ${memoire.sujet.titre}`
+                    : 'Sélection en cours de traitement...')
+                : 'Parcourez les sujets disponibles et choisissez celui qui vous intéresse.'}
+            </p>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -256,57 +303,33 @@ const SubjectSelection = () => {
                       </div>
                     </div>
 
-                    {memoire?.sujetId === sujet.id ? (
-                      <Button className="w-full mt-4" variant="outline" disabled>
-                        Sujet sélectionné
-                      </Button>
-                    ) : hasChosen ? (
-                      <Button className="w-full mt-4" variant="secondary" disabled>
-                        Vous avez déjà choisi un sujet
-                      </Button>
-                    ) : (
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            className="w-full mt-4"
-                            variant={isChosen ? 'outline' : 'default'}
-                            onClick={() => handleSelectSujet(sujet)}
-                          >
-                            {
-                                isChosen ? 'Sujet sélectionné' :
-                                disabled ? (memoire ? 'Vous avez déjà choisi un sujet' : 'Vous avez déjà choisi un sujet') :
-                                'Choisir ce Sujet'
-                              }
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Confirmer la sélection</DialogTitle>
-                            <DialogDescription>
-                              Êtes-vous sûr de vouloir choisir ce sujet ? Ce choix est définitif.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div>
-                              <h4 className="font-medium">Sujet sélectionné:</h4>
-                              <p className="text-sm text-gray-600">{sujet.titre}</p>
-                            </div>
-                            <div>
-                              <h4 className="font-medium">Encadreur:</h4>
-                              <p className="text-sm text-gray-600">
-                                {sujet.encadreur.prenom} {sujet.encadreur.nom}
-                              </p>
-                            </div>
-                            <div className="flex justify-end space-x-2">
-                              <Button variant="outline" onClick={() => setSelectedSujet(null)}>
-                                Annuler
-                              </Button>
-                              <Button onClick={handleConfirmSelection}>Confirmer</Button>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    )}
+                    <div className="mt-4">
+                      {memoire?.sujetId === sujet.id ? (
+                        <Button className="w-full" variant="outline" disabled>
+                          Sujet sélectionné
+                        </Button>
+                      ) : hasChosen ? (
+                        <Button className="w-full" variant="secondary" disabled>
+                          Vous avez déjà choisi un sujet
+                        </Button>
+                      ) : (
+                        <Button 
+                          onClick={() => handleSelectSujet(sujet)}
+                          disabled={hasChosen || isProcessing}
+                          className="w-full"
+                        >
+                          {isProcessing ? (
+                            <>
+                              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Traitement...
+                            </>
+                          ) : 'Choisir ce sujet'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

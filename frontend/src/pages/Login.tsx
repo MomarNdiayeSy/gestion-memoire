@@ -8,7 +8,9 @@ import { Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '../components/ui/use-toast';
 
-const Login = () => {
+type LoginProps = { onLogin?: (role: 'admin' | 'encadreur' | 'etudiant') => void };
+
+const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -35,6 +37,10 @@ const Login = () => {
         ETUDIANT: '/etudiant/dashboard',
       };
       navigate(dashboardRoutes[user.role]);
+      // Notify parent component of login if callback provided
+      if (onLogin) {
+        onLogin(user.role.toLowerCase() as 'admin' | 'encadreur' | 'etudiant');
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Email ou mot de passe incorrect');
     }
